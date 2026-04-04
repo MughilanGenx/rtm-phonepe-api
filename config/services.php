@@ -36,17 +36,15 @@ return [
     ],
 
     'phonepe' => [
-        'client_id' => env('PHONEPE_CLIENT_ID'),
-        'client_secret' => env('PHONEPE_CLIENT_SECRET'),
-        'client_version' => env('PHONEPE_CLIENT_VERSION'),
-        'merchant_id' => env('PHONEPE_MERCHANT_ID'),
-        'env' => env('PHONEPE_ENV'),
-        // 'base_url' => env('PHONEPE_ENV', 'sandbox') === 'production' 
-        //     ? 'https://api.phonepe.com/apis/hermes/pg/v1/pay' 
-        //     : 'https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay',
+        'client_id'      => env('PHONEPE_CLIENT_ID'),
+        'client_secret'  => env('PHONEPE_CLIENT_SECRET'),
+        'client_version' => env('PHONEPE_CLIENT_VERSION', '1'),
+        'merchant_id'    => env('PHONEPE_MERCHANT_ID'),
+        'env'            => env('PHONEPE_ENV', 'sandbox'),
+        'webhook_secret' => env('PHONEPE_WEBHOOK_SECRET'), // Used for HMAC signature validation
 
-        'base_url' => env('PHONEPE_ENV', 'sandbox') === 'production' 
-            ? 'https://api.phonepe.com/apis/pg' 
+        'base_url' => env('PHONEPE_ENV', 'sandbox') === 'production'
+            ? 'https://api.phonepe.com/apis/pg'
             : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
     ],
 

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\PhonepeServices;
 use App\Traits\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -17,156 +18,340 @@ class PaymentController extends Controller
 
     public function __construct(private PhonepeServices $phonePe) {}
 
-    public function generatePaymentLink(Request $request)
-    {
-        $rules = [
-            'amount' => 'required|numeric|min:1',
-            'merchant_order_id' => 'nullable|string|max:255',
-            'customer_name' => 'required|string|max:255',
-            'customer_email' => 'required|email|max:255',
-            'customer_phone' => 'required|string|max:15',
-        ];
+    // =========================================================================
+    // 1. Generate Payment Link
+    // =========================================================================
 
-        $validator = Validator::make($request->all(), $rules);
+    /**
+     * Create a pending payment record and return a local shareable link.
+     *
+     * POST /api/generate-payment-link
+     *
+     * Body:
+     *   amount          (required, numeric, min:1)
+     *   merchant_order_id (optional — auto-generated if omitted)
+     *   customer_name   (required)
+     *   customer_email  (required, email)
+     *   customer_phone  (required)
+     */
+    public function generatePaymentLink(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'amount'            => 'required|numeric|min:1',
+            'merchant_order_id' => 'nullable|string|max:255|unique:payments,merchant_order_id',
+            'customer_name'     => 'required|string|max:255',
+            'customer_email'    => 'required|email|max:255',
+            'customer_phone'    => 'required|string|max:15',
+        ]);
 
         if ($validator->fails()) {
-            return $this->error($validator->errors()->first(), 400);
+            return $this->error($validator->errors()->first(), 422);
         }
 
-        $merchant_order_id = $request->merchant_order_id ?? 'MERCHANT_'.strtoupper(substr(uniqid(), 0, 8));
+        $merchantOrderId = $request->merchant_order_id
+            ?? 'ORDER_' . strtoupper(substr(uniqid('', true), 0, 10));
 
         $payment = Payment::create([
-            'merchant_order_id' => $merchant_order_id,
-            'amount' => $request->amount,
-            'customer_name' => $request->customer_name,
-            'customer_email' => $request->customer_email,
-            'customer_phone' => $request->customer_phone,
-            'status' => PaymentStatus::INITIATED,
+            'merchant_order_id' => $merchantOrderId,
+            'amount'            => $request->amount,
+            'customer_name'     => $request->customer_name,
+            'customer_email'    => $request->customer_email,
+            'customer_phone'    => $request->customer_phone,
+            'status'            => PaymentStatus::INITIATED,
         ]);
 
-        $localLink = url('/pay/'.$merchant_order_id);
+        Log::info('Payment record created', [
+            'payment_id'        => $payment->id,
+            'merchant_order_id' => $merchantOrderId,
+            'amount'            => $payment->amount,
+        ]);
 
         return $this->success('Payment link generated successfully', [
-            'local_link' => $localLink,
-            'merchant_order_id' => $merchant_order_id,
-            'name' => $request->customer_name,
-            'email' => $request->customer_email,
-            'phone' => $request->customer_phone,
-            'amount' => $request->amount,
+            'payment_id'        => $payment->id,
+            'merchant_order_id' => $merchantOrderId,
+            'payment_link'      => url('/api/pay/' . $merchantOrderId),
+            'customer_name'     => $payment->customer_name,
+            'customer_email'    => $payment->customer_email,
+            'customer_phone'    => $payment->customer_phone,
+            'amount'            => $payment->amount,
+            'status'            => $payment->status->value,
         ]);
-
     }
 
-    public function processSharedLink($merchantOrderId)
+    // =========================================================================
+    // 2. Process Shared Link (redirect user to PhonePe)
+    // =========================================================================
+
+    /**
+     * Look up the payment and redirect the user to PhonePe's checkout.
+     *
+     * GET /api/pay/{merchantOrderId}
+     */
+    public function processSharedLink(string $merchantOrderId)
     {
         $payment = Payment::where('merchant_order_id', $merchantOrderId)->first();
 
         if (! $payment) {
-            Log::error('Payment not found', ['merchant_order_id' => $merchantOrderId]);
-
+            Log::error('Payment not found for shared link', ['merchant_order_id' => $merchantOrderId]);
             return $this->error('Payment not found', 404);
         }
 
+        // Only INITIATED payments can be started; others are terminal or in progress
         if ($payment->status !== PaymentStatus::INITIATED) {
-            Log::error('Payment already processed', ['merchant_order_id' => $merchantOrderId]);
-
-            return $this->error('Payment already processed', 400);
+            Log::info('Payment already processed, not re-initiating', [
+                'merchant_order_id' => $merchantOrderId,
+                'status'            => $payment->status->value,
+            ]);
+            return $this->error(
+                'This payment link has already been used (status: ' . $payment->status->label() . ')',
+                400
+            );
         }
 
+        // Re-use existing PhonePe link if already generated (idempotent)
         if ($payment->phonepe_link) {
-            return $this->redirect($payment->phonepe_link);
+            Log::info('Reusing existing PhonePe link', ['merchant_order_id' => $merchantOrderId]);
+            return redirect()->away($payment->phonepe_link);
         }
 
         try {
-
             $response = $this->phonePe->initiatePayment([
                 'merchant_order_id' => $merchantOrderId,
-                'amount' => $payment->amount,
-                'name' => $payment->customer_name,
-                'email' => $payment->customer_email,
-                'phone' => $payment->customer_phone,
+                'amount'            => $payment->amount,
+                'name'              => $payment->customer_name,
+                'email'             => $payment->customer_email,
+                'phone'             => $payment->customer_phone,
             ]);
 
-            if (isset($response['redirectUrl'])) {
-                $payment->update(['phonepe_link' => $response['redirectUrl']]);
-
-                return redirect()->away($response['redirectUrl']);
+            if (empty($response['redirectUrl'])) {
+                Log::error('PhonePe did not return a redirect URL', [
+                    'merchant_order_id' => $merchantOrderId,
+                    'response'          => $response,
+                ]);
+                return $this->error('Payment initiation failed — no redirect URL received.', 502);
             }
 
-            return $this->error('Payment initiation failed. Please try again.', 400);
+            // Persist the PhonePe link so we can reuse it without hitting the API again
+            $payment->update(['phonepe_link' => $response['redirectUrl']]);
 
-        } catch (\Exception $e) {
-
-            Log::error('Payment initiation failed', [
+            Log::info('Redirecting to PhonePe checkout', [
                 'merchant_order_id' => $merchantOrderId,
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'redirect_url'      => $response['redirectUrl'],
             ]);
 
-            return $this->error('Payment initiation failed. Please try again.', 400);
+            return redirect()->away($response['redirectUrl']);
+
+        } catch (\Exception $e) {
+            Log::error('Payment initiation exception', [
+                'merchant_order_id' => $merchantOrderId,
+                'error'             => $e->getMessage(),
+            ]);
+            return $this->error('Payment initiation failed. Please try again.', 500);
         }
-
-        return $this->success('Payment link processed successfully', [
-            'payment' => $payment,
-        ]);
-
     }
 
-    public function callback(Request $request)
+    // =========================================================================
+    // 3. Redirect Callback (PhonePe redirect after payment)
+    // =========================================================================
+
+    /**
+     * Handle PhonePe's browser redirect after the user completes (or abandons) payment.
+     * PhonePe sends the merchantOrderId via URL param — do NOT trust this status alone;
+     * always verify via server-to-server status check.
+     *
+     * GET /api/payment/callback/{merchantOrderId}
+     */
+    public function callback(string $merchantOrderId): JsonResponse
     {
-        Log::info('PhonePe Callback Reached', [
-            'method' => $request->method(),
-            'payload' => $request->all(),
-            'url' => $request->fullUrl(),
+        Log::info('PhonePe redirect callback received', [
+            'merchant_order_id' => $merchantOrderId,
         ]);
 
-        $payload = $this->phonePe->decodeResponsePayload($request->all());
-        if ($payload !== $request->all()) {
-            Log::info('Decoded PhonePe Callback Payload', ['payload' => $payload]);
-        }
+        return $this->verifyAndUpdatePayment($merchantOrderId);
+    }
 
-        $merchantOrderId = $this->phonePe->extractMerchantOrderId($payload)
-            ?? $request->input('merchantOrderId')
-            ?? $request->input('transactionId');
+    // =========================================================================
+    // 4. Webhook (server-to-server from PhonePe)
+    // =========================================================================
 
-        if (! $merchantOrderId) {
-            // Check if it's in the URL itself if PhonePe didn't append it correctly
-            return redirect()->route('payment.failed', ['error' => 'Invalid callback. Order ID missing. Check logs for payload details.']);
+    /**
+     * Handle PhonePe server-to-server webhook notification.
+     * Validates HMAC signature before processing.
+     *
+     * POST /api/webhook/phonepe
+     */
+    public function webhook(Request $request): JsonResponse
+    {
+        Log::info('PhonePe webhook received', [
+            'method'  => $request->method(),
+            'headers' => $request->headers->all(),
+        ]);
+
+        // Step 1: Validate webhook signature
+        if (! $this->phonePe->validateWebhookSignature($request)) {
+            Log::warning('PhonePe webhook signature validation failed');
+            return $this->error('Invalid webhook signature', 401, 'SIGNATURE_INVALID');
         }
 
         try {
-            $statusResponse = $this->phonePe->checkStatus($merchantOrderId);
+            // Step 2: Decode base64-encoded payload if needed
+            $payload = $this->phonePe->decodeResponsePayload($request->all());
+
+            // Step 3: Extract merchant order ID
+            $merchantOrderId = $this->phonePe->extractMerchantOrderId($payload)
+                ?? $request->input('merchantOrderId')
+                ?? $request->input('transactionId');
+
+            if (! $merchantOrderId) {
+                Log::error('PhonePe webhook: merchant order ID not found', ['payload' => $payload]);
+                return $this->error('Invalid webhook payload — order ID missing', 400);
+            }
+
+            // Step 4: Verify and update
+            return $this->verifyAndUpdatePayment($merchantOrderId);
+
+        } catch (\Exception $e) {
+            Log::error('PhonePe webhook processing exception', [
+                'error'   => $e->getMessage(),
+                'payload' => $request->all(),
+            ]);
+
+            return $this->error('Webhook processing failed: ' . $e->getMessage(), 500, 'WEBHOOK_ERROR');
+        }
+    }
+
+    // =========================================================================
+    // 5. Manual Status Check
+    // =========================================================================
+
+    /**
+     * Manually check and sync payment status from PhonePe.
+     *
+     * GET /api/payment/status/{merchantOrderId}
+     */
+    public function checkPaymentStatus(string $merchantOrderId): JsonResponse
+    {
+        try {
+            Log::info('Manual payment status check', ['merchant_order_id' => $merchantOrderId]);
+
             $payment = Payment::where('merchant_order_id', $merchantOrderId)->first();
 
             if (! $payment) {
-                return redirect()->route('payment.failed', ['error' => 'Order not found in database: '.$merchantOrderId]);
+                return $this->error('Payment not found', 404, 'PAYMENT_NOT_FOUND');
             }
 
-            $attrs = $this->phonePe->attributesFromStatusResponse($statusResponse);
-            unset($attrs['merchant_order_id']);
-            $payment->update($attrs);
-
-            $newStatus = $payment->fresh()->status;
-
-            if ($newStatus === 'COMPLETED') {
-                return redirect()->route('payment.success', ['order' => $merchantOrderId])
-                    ->with('payment', $payment->fresh());
-            }
-
-            if ($newStatus === 'PENDING') {
-                return redirect()->route('payment.failed', [
-                    'error' => 'Payment is still PENDING. Please refresh the history page in a few moments.',
+            // Idempotency: if already in a terminal state, return cached DB result
+            if ($payment->status->isTerminal()) {
+                Log::info('Payment already in terminal state, returning DB result', [
+                    'merchant_order_id' => $merchantOrderId,
+                    'status'            => $payment->status->value,
                 ]);
+
+                return $this->buildPaymentStatusResponse($payment);
             }
 
-            return redirect()->route('payment.failed', [
-                'error' => 'Payment failed. State: '.$newStatus,
-            ]);
+            // Otherwise live-check from PhonePe
+            return $this->verifyAndUpdatePayment($merchantOrderId);
 
         } catch (\Exception $e) {
-            return redirect()->route('payment.failed', [
-                'error' => 'Status check failed: '.$e->getMessage(),
+            Log::error('Payment status check failed', [
+                'merchant_order_id' => $merchantOrderId,
+                'error'             => $e->getMessage(),
             ]);
+
+            return $this->error(
+                'Failed to check payment status: ' . $e->getMessage(),
+                500,
+                'STATUS_CHECK_ERROR'
+            );
         }
+    }
+
+    // =========================================================================
+    // 6. List All Transactions
+    // =========================================================================
+
+    /**
+     * Return a paginated list of all payment records.
+     *
+     * GET /api/transactions
+     */
+    public function getAllTransactions(): JsonResponse
+    {
+        $payments = Payment::latest()->paginate(20);
+
+        return $this->success('Transactions fetched successfully', $payments);
+    }
+
+    // =========================================================================
+    // Private Helpers
+    // =========================================================================
+
+    /**
+     * Core payment verification logic shared by callback, webhook, and status check.
+     * Performs server-to-server status verification with PhonePe and updates DB atomically.
+     */
+    private function verifyAndUpdatePayment(string $merchantOrderId): JsonResponse
+    {
+        // Fetch payment record
+        $payment = Payment::where('merchant_order_id', $merchantOrderId)->first();
+
+        if (! $payment) {
+            Log::error('Payment record not found', ['merchant_order_id' => $merchantOrderId]);
+            return $this->error('Order not found: ' . $merchantOrderId, 404, 'PAYMENT_NOT_FOUND');
+        }
+
+        // Idempotency guard: skip re-verification if already terminal
+        if ($payment->status->isTerminal()) {
+            Log::info('Skipping re-verification — payment already in terminal state', [
+                'merchant_order_id' => $merchantOrderId,
+                'status'            => $payment->status->value,
+            ]);
+            return $this->buildPaymentStatusResponse($payment);
+        }
+
+        // Server-to-server status check with PhonePe
+        $statusResponse = $this->phonePe->checkStatus($merchantOrderId);
+
+        // Extract and map attributes
+        $attrs = $this->phonePe->attributesFromStatusResponse($statusResponse);
+        unset($attrs['merchant_order_id']); // Never override the order ID
+
+        // Atomic update
+        $payment->update($attrs);
+        $payment->refresh();
+
+        Log::info('Payment status updated', [
+            'payment_id'        => $payment->id,
+            'merchant_order_id' => $merchantOrderId,
+            'new_status'        => $payment->status->value,
+            'transaction_id'    => $payment->transaction_id,
+        ]);
+
+        return $this->buildPaymentStatusResponse($payment);
+    }
+
+    /**
+     * Build a standardised JSON response based on the current payment status.
+     */
+    private function buildPaymentStatusResponse(Payment $payment): JsonResponse
+    {
+        $data = [
+            'transaction_id'    => $payment->transaction_id,
+            'amount'            => $payment->amount,
+            'payment_status'    => strtoupper($payment->status->value),
+            'payment_id'        => $payment->id,
+            'merchant_order_id' => $payment->merchant_order_id,
+            'paid_at'           => $payment->paid_at?->toISOString(),
+        ];
+
+        return match ($payment->status) {
+            PaymentStatus::COMPLETED => $this->success('Payment verified successfully', $data),
+            PaymentStatus::PENDING   => $this->pending($data, 'Payment is still being processed. Please check back shortly.', 202),
+            PaymentStatus::DECLINED  => $this->error('Payment was declined. Please try a different payment method.', 400, 'PAYMENT_DECLINED', $data),
+            PaymentStatus::CANCELLED => $this->error('Payment was cancelled.', 400, 'PAYMENT_CANCELLED', $data),
+            PaymentStatus::ERROR     => $this->error('An error occurred while processing payment. Please try again.', 400, 'PAYMENT_ERROR', $data),
+            default                  => $this->pending($data, 'Payment is being initiated.', 202),
+        };
     }
 }
