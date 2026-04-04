@@ -41,9 +41,13 @@ return [
         'client_version' => env('PHONEPE_CLIENT_VERSION'),
         'merchant_id' => env('PHONEPE_MERCHANT_ID'),
         'env' => env('PHONEPE_ENV'),
+        // 'base_url' => env('PHONEPE_ENV', 'sandbox') === 'production' 
+        //     ? 'https://api.phonepe.com/apis/hermes/pg/v1/pay' 
+        //     : 'https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay',
+
         'base_url' => env('PHONEPE_ENV', 'sandbox') === 'production' 
-            ? 'https://api.phonepe.com/apis/hermes/pg/v1/pay' 
-            : 'https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay',
+            ? 'https://api.phonepe.com/apis/pg' 
+            : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
     ],
 
 ];
