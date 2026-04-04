@@ -20,6 +20,7 @@ class Payment extends Model
         'transaction_id',
         'phonepe_order_id',
         'payment_response',
+        'phone_link',
         'last_synced_at',
     ];
 

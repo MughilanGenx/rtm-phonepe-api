@@ -9,8 +9,11 @@ use Illuminate\Support\Facades\Log;
 class PhonepeServices
 {
     private string $clientId;
+
     private string $clientSecret;
+
     private string $baseUrl;
+
     private string $clientVersion;
 
     /**
@@ -24,7 +27,8 @@ class PhonepeServices
         $this->baseUrl = config('services.phonepe.base_url');
     }
 
-    public function getAccessToken(): string    {
+    public function getAccessToken(): string
+    {
 
         return Cache::remember('phonepe_access_token', 600, function () {
             $authUrl = config('services.phonepe.env') === 'production'
@@ -63,7 +67,8 @@ class PhonepeServices
         });
     }
 
-    public function initiatePayment(array $data): array {
+    public function initiatePayment(array $data): array
+    {
         $token = $this->getAccessToken();
 
         $payload = [
@@ -79,7 +84,7 @@ class PhonepeServices
                 'type' => 'PG_CHECKOUT',
                 'message' => 'Payment for Order '.$data['merchant_order_id'],
                 'merchantUrls' => [
-                    'redirectUrl' => route('phonepe.callback', ['merchantOrderId' => $data['merchant_order_id']]),
+                    'redirectUrl' => url('/pay/'.$data['merchant_order_id']),
                 ],
             ],
         ];
@@ -96,24 +101,100 @@ class PhonepeServices
             ->withoutVerifying()  // Disable SSL verification for sandbox
             ->post($this->baseUrl.'/checkout/v2/pay', $payload);
 
-            Log::info('PhonePe Initiate Payment Response:', [
+        Log::info('PhonePe Initiate Payment Response:', [
             'status' => $response->status(),
             'body' => $response->body(),
         ]);
 
-            if (! $response->successful()) {
+        if (! $response->successful()) {
             throw new \Exception('PhonePe Payment Initiation Failed: '.$response->body());
         }
 
-        
         $json = $response->json();
 
         // PhonePe v2 API may return redirectUrl nested inside 'data' — normalize to root level
         if (! isset($json['redirectUrl']) && isset($json['data']['redirectUrl'])) {
             $json['redirectUrl'] = $json['data']['redirectUrl'];
         }
+
         return $json;
     }
 
-    
+    public function decodeResponsePayload(array $payload): array
+    {
+        if (! isset($payload['response']) || ! is_string($payload['response'])) {
+            return $payload;
+        }
+
+        $decodedJson = base64_decode($payload['response'], true);
+        if ($decodedJson === false) {
+            return $payload;
+        }
+
+        $decodedArray = json_decode($decodedJson, true);
+
+        return is_array($decodedArray) ? $decodedArray : $payload;
+    }
+
+    public function extractMerchantOrderId(array $payload): ?string {}
+
+    public function attributesFromStatusResponse(array $statusResponse): array {}
+
+    public function checkStatus(string $merchantOrderId, bool $withDetails = true): array
+    {
+        $token = $this->getAccessToken();
+
+        $url = $this->baseUrl.'/checkout/v2/order/'.$merchantOrderId.'/status';
+
+        $query = $withDetails ? ['details' => 'true'] : [];
+
+        Log::info('PhonePe Check Status Request:', ['url' => $url, 'query' => $query]);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'O-Bearer '.$token,
+            'Content-Type' => 'application/json',
+        ])
+            ->withoutVerifying()  // Disable SSL verification for sandbox
+            ->get($url, $query);
+
+        Log::info('PhonePe Check Status Response:', [
+            'status' => $response->status(),
+            'body' => $response->body(),
+        ]);
+
+        if (! $response->successful()) {
+            throw new \Exception('PhonePe Status Check Failed: '.$response->body());
+        }
+
+        $body = (string) $response->body();
+        if ($response->status() === 204 || trim($body) === '') {
+            throw new \Exception(
+                'PhonePe returned an empty order response (HTTP '.$response->status().'). '.
+                'Check that PHONEPE_ENV matches where the payment was created (sandbox vs production), '.
+                'and that the Merchant Order ID is exactly the one used when the payment link was issued.'
+            );
+        }
+
+        $json = $response->json();
+        if (! is_array($json)) {
+            throw new \Exception('PhonePe Status Check: invalid JSON body');
+        }
+
+        return $this->normalizeOrderStatusResponse($json);
+    }
+
+    public function normalizeOrderStatusResponse(array $json): array
+    {
+        if (array_key_exists('success', $json) && $json['success'] === false) {
+            $msg = $json['message'] ?? $json['code'] ?? 'Unknown error';
+
+            throw new \Exception('PhonePe Order Status: '.$msg);
+        }
+
+        if (($json['success'] ?? null) === true && isset($json['data']) && is_array($json['data'])) {
+            return $json['data'];
+        }
+
+        return $json;
+    }
 }
