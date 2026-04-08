@@ -12,9 +12,9 @@ class Payment extends Model
 
     protected $fillable = [
         'merchant_order_id',
-        'customer_name',
-        'customer_email',
-        'customer_phone',
+        'name',
+        'email',
+        'phone',
         'amount',
         'status',
         'phonepe_link',       // Fixed: was 'phone_link' (typo)

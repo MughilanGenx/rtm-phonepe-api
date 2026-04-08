@@ -32,9 +32,9 @@ class PaymentController extends Controller
      * Body:
      *   amount          (required, numeric, min:1)
      *   merchant_order_id (optional — auto-generated if omitted)
-     *   customer_name   (required)
-     *   customer_email  (required, email)
-     *   customer_phone  (required)
+     *   name            (required)
+     *   email           (required, email)
+     *   phone           (required)
      */
     #[OA\Post(
         path: '/api/generate-payment-link',
@@ -44,13 +44,13 @@ class PaymentController extends Controller
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['amount', 'customer_name', 'customer_email', 'customer_phone'],
+                required: ['amount', 'name', 'email', 'phone'],
                 properties: [
                     new OA\Property(property: 'amount', type: 'number', minimum: 1, example: 100),
                     new OA\Property(property: 'merchant_order_id', type: 'string', nullable: true, example: 'ORDER_12345'),
-                    new OA\Property(property: 'customer_name', type: 'string', example: 'John Doe'),
-                    new OA\Property(property: 'customer_email', type: 'string', format: 'email', example: 'john@example.com'),
-                    new OA\Property(property: 'customer_phone', type: 'string', example: '9876543210'),
+                    new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'john@example.com'),
+                    new OA\Property(property: 'phone', type: 'string', example: '9876543210'),
                 ]
             )
         ),
@@ -66,9 +66,9 @@ class PaymentController extends Controller
                             new OA\Property(property: 'payment_id', type: 'integer', example: 1),
                             new OA\Property(property: 'merchant_order_id', type: 'string', example: 'ORDER_12345'),
                             new OA\Property(property: 'payment_link', type: 'string', example: 'http://localhost/api/pay/ORDER_12345'),
-                            new OA\Property(property: 'customer_name', type: 'string', example: 'John Doe'),
-                            new OA\Property(property: 'customer_email', type: 'string', example: 'john@example.com'),
-                            new OA\Property(property: 'customer_phone', type: 'string', example: '9876543210'),
+                            new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
+                            new OA\Property(property: 'email', type: 'string', example: 'john@example.com'),
+                            new OA\Property(property: 'phone', type: 'string', example: '9876543210'),
                             new OA\Property(property: 'amount', type: 'number', example: 100),
                             new OA\Property(property: 'status', type: 'string', example: 'INITIATED'),
                         ])
@@ -83,9 +83,9 @@ class PaymentController extends Controller
         $validator = Validator::make($request->all(), [
             'amount'            => 'required|numeric|min:1',
             'merchant_order_id' => 'nullable|string|max:255|unique:payments,merchant_order_id',
-            'customer_name'     => 'required|string|max:255',
-            'customer_email'    => 'required|email|max:255',
-            'customer_phone'    => 'required|string|max:15',
+            'name'              => 'required|string|max:255',
+            'email'             => 'required|email|max:255',
+            'phone'             => 'required|string|max:15',
         ]);
 
         if ($validator->fails()) {
@@ -98,9 +98,9 @@ class PaymentController extends Controller
         $payment = Payment::create([
             'merchant_order_id' => $merchantOrderId,
             'amount'            => $request->amount,
-            'customer_name'     => $request->customer_name,
-            'customer_email'    => $request->customer_email,
-            'customer_phone'    => $request->customer_phone,
+            'name'              => $request->name,
+            'email'             => $request->email,
+            'phone'             => $request->phone,
             'status'            => PaymentStatus::INITIATED,
         ]);
 
@@ -114,9 +114,9 @@ class PaymentController extends Controller
             'payment_id'        => $payment->id,
             'merchant_order_id' => $merchantOrderId,
             'payment_link'      => url('/api/pay/' . $merchantOrderId),
-            'customer_name'     => $payment->customer_name,
-            'customer_email'    => $payment->customer_email,
-            'customer_phone'    => $payment->customer_phone,
+            'name'              => $payment->name,
+            'email'             => $payment->email,
+            'phone'             => $payment->phone,
             'amount'            => $payment->amount,
             'status'            => $payment->status->value,
         ]);
@@ -177,9 +177,9 @@ class PaymentController extends Controller
             $response = $this->phonePe->initiatePayment([
                 'merchant_order_id' => $merchantOrderId,
                 'amount'            => $payment->amount,
-                'name'              => $payment->customer_name,
-                'email'             => $payment->customer_email,
-                'phone'             => $payment->customer_phone,
+                'name'              => $payment->name,
+                'email'             => $payment->email,
+                'phone'             => $payment->phone,
             ]);
 
             if (empty($response['redirectUrl'])) {
@@ -229,19 +229,30 @@ class PaymentController extends Controller
             new OA\Parameter(name: 'merchantOrderId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Payment verified successfully'),
-            new OA\Response(response: 202, description: 'Payment is still being processed'),
-            new OA\Response(response: 400, description: 'Payment declined, cancelled, or error'),
-            new OA\Response(response: 404, description: 'Payment not found')
+            new OA\Response(response: 302, description: 'Redirect to frontend application')
         ]
     )]
-    public function callback(string $merchantOrderId): JsonResponse
+    public function callback(string $merchantOrderId)
     {
         Log::info('PhonePe redirect callback received', [
             'merchant_order_id' => $merchantOrderId,
         ]);
 
-        return $this->verifyAndUpdatePayment($merchantOrderId);
+        try {
+            // Verify and update the payment state in the database cleanly before redirecting.
+            $this->verifyAndUpdatePayment($merchantOrderId);
+        } catch (\Exception $e) {
+            Log::error('PhonePe redirect verification exception', [
+                'merchant_order_id' => $merchantOrderId,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        // Default to a sensible fallback if FRONTEND_URL is not provided
+        $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:5173')), '/');
+
+        // Note: the React frontend will read the orderId parameter and immediately run /api/payment/status check.
+        return redirect()->away($frontendUrl . '?orderId=' . urlencode($merchantOrderId));
     }
 
     // =========================================================================
@@ -425,9 +436,9 @@ class PaymentController extends Controller
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('merchant_order_id', 'like', "%{$searchTerm}%")
-                  ->orWhere('customer_name', 'like', "%{$searchTerm}%")
-                  ->orWhere('customer_email', 'like', "%{$searchTerm}%")
-                  ->orWhere('customer_phone', 'like', "%{$searchTerm}%")
+                  ->orWhere('name', 'like', "%{$searchTerm}%")
+                  ->orWhere('email', 'like', "%{$searchTerm}%")
+                  ->orWhere('phone', 'like', "%{$searchTerm}%")
                   ->orWhere('transaction_id', 'like', "%{$searchTerm}%");
             });
         }

@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->string('merchant_order_id');
-            $table->string('customer_name');
-            $table->string('customer_email');
-            $table->string('customer_phone');
+            $table->string('name');
+            $table->string('email');
+            $table->string('phone');
             $table->decimal('amount', 10, 2);
             $table->string('status')->default(\App\Enums\PaymentStatus::INITIATED->value);
             $table->longText('phonepe_link')->nullable();

@@ -21,9 +21,9 @@
                             "schema": {
                                 "required": [
                                     "amount",
-                                    "customer_name",
-                                    "customer_email",
-                                    "customer_phone"
+                                    "name",
+                                    "email",
+                                    "phone"
                                 ],
                                 "properties": {
                                     "amount": {
@@ -36,16 +36,16 @@
                                         "example": "ORDER_12345",
                                         "nullable": true
                                     },
-                                    "customer_name": {
+                                    "name": {
                                         "type": "string",
                                         "example": "John Doe"
                                     },
-                                    "customer_email": {
+                                    "email": {
                                         "type": "string",
                                         "format": "email",
                                         "example": "john@example.com"
                                     },
-                                    "customer_phone": {
+                                    "phone": {
                                         "type": "string",
                                         "example": "9876543210"
                                     }
@@ -84,15 +84,15 @@
                                                     "type": "string",
                                                     "example": "http://localhost/api/pay/ORDER_12345"
                                                 },
-                                                "customer_name": {
+                                                "name": {
                                                     "type": "string",
                                                     "example": "John Doe"
                                                 },
-                                                "customer_email": {
+                                                "email": {
                                                     "type": "string",
                                                     "example": "john@example.com"
                                                 },
-                                                "customer_phone": {
+                                                "phone": {
                                                     "type": "string",
                                                     "example": "9876543210"
                                                 },
@@ -172,17 +172,8 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Payment verified successfully"
-                    },
-                    "202": {
-                        "description": "Payment is still being processed"
-                    },
-                    "400": {
-                        "description": "Payment declined, cancelled, or error"
-                    },
-                    "404": {
-                        "description": "Payment not found"
+                    "302": {
+                        "description": "Redirect to frontend application"
                     }
                 }
             }
