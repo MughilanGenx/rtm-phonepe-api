@@ -148,31 +148,49 @@ class PaymentController extends Controller
     )]
     public function processSharedLink(string $merchantOrderId)
     {
+        $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:5173')), '/');
+
         $payment = Payment::where('merchant_order_id', $merchantOrderId)->first();
 
+        // ── Payment not found ──────────────────────────────────────────────────
         if (! $payment) {
             Log::error('Payment not found for shared link', ['merchant_order_id' => $merchantOrderId]);
-            return $this->error('Payment not found', 404);
-        }
-
-        // Only INITIATED payments can be started; others are terminal or in progress
-        if ($payment->status !== PaymentStatus::INITIATED) {
-            Log::info('Payment already processed, not re-initiating', [
-                'merchant_order_id' => $merchantOrderId,
-                'status'            => $payment->status->value,
-            ]);
-            return $this->error(
-                'This payment link has already been used (status: ' . $payment->status->label() . ')',
-                400
+            return redirect()->away(
+                $frontendUrl . '/payment/status?' . http_build_query([
+                    'orderId' => $merchantOrderId,
+                    'status'  => 'ERROR',
+                    'error'   => 'Payment not found. Please check your link or contact support.',
+                ])
             );
         }
 
-        // Re-use existing PhonePe link if already generated (idempotent)
+        // ── Already used / terminal status ─────────────────────────────────────
+        if ($payment->status !== PaymentStatus::INITIATED) {
+            Log::info('Payment already processed, redirecting to status page', [
+                'merchant_order_id' => $merchantOrderId,
+                'status'            => $payment->status->value,
+            ]);
+
+            // Send them straight to the status page — they'll see their real status
+            return redirect()->away(
+                $frontendUrl . '/payment/status?' . http_build_query([
+                    'orderId'       => $merchantOrderId,
+                    'status'        => strtoupper($payment->status->value),
+                    'amount'        => $payment->amount,
+                    'transactionId' => $payment->transaction_id ?? '',
+                    'paidAt'        => $payment->paid_at?->toISOString() ?? '',
+                    'error'         => 'This payment link has already been used (status: ' . $payment->status->label() . ').',
+                ])
+            );
+        }
+
+        // ── Re-use existing PhonePe link (idempotent) ──────────────────────────
         if ($payment->phonepe_link) {
             Log::info('Reusing existing PhonePe link', ['merchant_order_id' => $merchantOrderId]);
             return redirect()->away($payment->phonepe_link);
         }
 
+        // ── Initiate payment with PhonePe ──────────────────────────────────────
         try {
             $response = $this->phonePe->initiatePayment([
                 'merchant_order_id' => $merchantOrderId,
@@ -187,10 +205,15 @@ class PaymentController extends Controller
                     'merchant_order_id' => $merchantOrderId,
                     'response'          => $response,
                 ]);
-                return $this->error('Payment initiation failed — no redirect URL received.', 502);
+                return redirect()->away(
+                    $frontendUrl . '/payment/status?' . http_build_query([
+                        'orderId' => $merchantOrderId,
+                        'status'  => 'ERROR',
+                        'error'   => 'Payment initiation failed — no redirect URL received. Please try again.',
+                    ])
+                );
             }
 
-            // Persist the PhonePe link so we can reuse it without hitting the API again
             $payment->update(['phonepe_link' => $response['redirectUrl']]);
 
             Log::info('Redirecting to PhonePe checkout', [
@@ -205,9 +228,16 @@ class PaymentController extends Controller
                 'merchant_order_id' => $merchantOrderId,
                 'error'             => $e->getMessage(),
             ]);
-            return $this->error('Payment initiation failed. Please try again.', 500);
+            return redirect()->away(
+                $frontendUrl . '/payment/status?' . http_build_query([
+                    'orderId' => $merchantOrderId,
+                    'status'  => 'ERROR',
+                    'error'   => 'Payment initiation failed: ' . $e->getMessage(),
+                ])
+            );
         }
     }
+
 
     // =========================================================================
     // 3. Redirect Callback (PhonePe redirect after payment)
@@ -223,13 +253,16 @@ class PaymentController extends Controller
     #[OA\Get(
         path: '/api/payment/callback/{merchantOrderId}',
         summary: 'PhonePe Redirect Callback',
-        description: 'Handle PhonePe browser redirect after the user completes or abandons payment.',
+        description: 'Handles PhonePe browser redirect after payment. Performs a server-to-server status verification, updates the DB, then redirects the frontend to /payment/status with query params: orderId, status (COMPLETED|PENDING|DECLINED|CANCELLED|ERROR), amount, transactionId, paidAt. On failure, an extra `error` param is included and status defaults to PENDING.',
         tags: ['Payment'],
         parameters: [
             new OA\Parameter(name: 'merchantOrderId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
         ],
         responses: [
-            new OA\Response(response: 302, description: 'Redirect to frontend application')
+            new OA\Response(
+                response: 302,
+                description: 'Redirect to {FRONTEND_URL}/payment/status?orderId=&status=&amount=&transactionId=&paidAt='
+            )
         ]
     )]
     public function callback(string $merchantOrderId)
@@ -238,21 +271,44 @@ class PaymentController extends Controller
             'merchant_order_id' => $merchantOrderId,
         ]);
 
+        $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:5173')), '/');
+
+        // Default query params (shown if verification fails)
+        $queryParams = [
+            'orderId' => $merchantOrderId,
+            'status'  => 'PENDING',
+        ];
+
         try {
-            // Verify and update the payment state in the database cleanly before redirecting.
+            // Server-to-server status verification with PhonePe
             $this->verifyAndUpdatePayment($merchantOrderId);
+
+            // Re-fetch the freshly updated payment record
+            $payment = \App\Models\Payment::where('merchant_order_id', $merchantOrderId)->first();
+
+            if ($payment) {
+                $queryParams = [
+                    'orderId'       => $merchantOrderId,
+                    'status'        => strtoupper($payment->status->value),
+                    'amount'        => $payment->amount,
+                    'transactionId' => $payment->transaction_id ?? '',
+                    'paidAt'        => $payment->paid_at?->toISOString() ?? '',
+                ];
+
+                Log::info('PhonePe callback verified, redirecting frontend', $queryParams);
+            }
         } catch (\Exception $e) {
             Log::error('PhonePe redirect verification exception', [
                 'merchant_order_id' => $merchantOrderId,
-                'error' => $e->getMessage()
+                'error'             => $e->getMessage(),
             ]);
+
+            // Still redirect — frontend will show PENDING and can retry /api/payment/status
+            $queryParams['error'] = 'Verification failed. Please check your payment status.';
         }
 
-        // Default to a sensible fallback if FRONTEND_URL is not provided
-        $frontendUrl = rtrim(config('app.frontend_url', env('FRONTEND_URL', 'http://localhost:5173')), '/');
-
-        // Note: the React frontend will read the orderId parameter and immediately run /api/payment/status check.
-        return redirect()->away($frontendUrl . '?orderId=' . urlencode($merchantOrderId));
+        // Redirect to frontend with all payment status query params
+        return redirect()->away($frontendUrl . '/payment/status?' . http_build_query($queryParams));
     }
 
     // =========================================================================

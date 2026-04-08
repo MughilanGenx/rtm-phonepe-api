@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL Configuration
+    |--------------------------------------------------------------------------
+    |
+    | This URL is used for payment callback redirects to the React frontend
+    | after payment completion. Set this to where your React app is running.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
