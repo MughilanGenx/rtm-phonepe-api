@@ -11,7 +11,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use OpenApi\Attributes as OA;
 
+#[OA\Tag(name: 'Payment', description: 'PhonePe Payment API Endpoints')]
 class PaymentController extends Controller
 {
     use ApiResponse;
@@ -34,6 +36,48 @@ class PaymentController extends Controller
      *   customer_email  (required, email)
      *   customer_phone  (required)
      */
+    #[OA\Post(
+        path: '/api/generate-payment-link',
+        summary: 'Generate Payment Link',
+        description: 'Create a pending payment record and return a local shareable link.',
+        tags: ['Payment'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['amount', 'customer_name', 'customer_email', 'customer_phone'],
+                properties: [
+                    new OA\Property(property: 'amount', type: 'number', minimum: 1, example: 100),
+                    new OA\Property(property: 'merchant_order_id', type: 'string', nullable: true, example: 'ORDER_12345'),
+                    new OA\Property(property: 'customer_name', type: 'string', example: 'John Doe'),
+                    new OA\Property(property: 'customer_email', type: 'string', format: 'email', example: 'john@example.com'),
+                    new OA\Property(property: 'customer_phone', type: 'string', example: '9876543210'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Payment link generated successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Payment link generated successfully'),
+                        new OA\Property(property: 'data', type: 'object', properties: [
+                            new OA\Property(property: 'payment_id', type: 'integer', example: 1),
+                            new OA\Property(property: 'merchant_order_id', type: 'string', example: 'ORDER_12345'),
+                            new OA\Property(property: 'payment_link', type: 'string', example: 'http://localhost/api/pay/ORDER_12345'),
+                            new OA\Property(property: 'customer_name', type: 'string', example: 'John Doe'),
+                            new OA\Property(property: 'customer_email', type: 'string', example: 'john@example.com'),
+                            new OA\Property(property: 'customer_phone', type: 'string', example: '9876543210'),
+                            new OA\Property(property: 'amount', type: 'number', example: 100),
+                            new OA\Property(property: 'status', type: 'string', example: 'INITIATED'),
+                        ])
+                    ]
+                )
+            ),
+            new OA\Response(response: 422, description: 'Validation Error')
+        ]
+    )]
     public function generatePaymentLink(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -87,6 +131,21 @@ class PaymentController extends Controller
      *
      * GET /api/pay/{merchantOrderId}
      */
+    #[OA\Get(
+        path: '/api/pay/{merchantOrderId}',
+        summary: 'Process Shared Link',
+        description: 'Look up the payment and redirect the user to PhonePe checkout.',
+        tags: ['Payment'],
+        parameters: [
+            new OA\Parameter(name: 'merchantOrderId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
+        ],
+        responses: [
+            new OA\Response(response: 302, description: 'Redirect to PhonePe checkout'),
+            new OA\Response(response: 404, description: 'Payment not found'),
+            new OA\Response(response: 400, description: 'Payment link already used'),
+            new OA\Response(response: 502, description: 'Payment initiation failed')
+        ]
+    )]
     public function processSharedLink(string $merchantOrderId)
     {
         $payment = Payment::where('merchant_order_id', $merchantOrderId)->first();
@@ -161,6 +220,21 @@ class PaymentController extends Controller
      *
      * GET /api/payment/callback/{merchantOrderId}
      */
+    #[OA\Get(
+        path: '/api/payment/callback/{merchantOrderId}',
+        summary: 'PhonePe Redirect Callback',
+        description: 'Handle PhonePe browser redirect after the user completes or abandons payment.',
+        tags: ['Payment'],
+        parameters: [
+            new OA\Parameter(name: 'merchantOrderId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Payment verified successfully'),
+            new OA\Response(response: 202, description: 'Payment is still being processed'),
+            new OA\Response(response: 400, description: 'Payment declined, cancelled, or error'),
+            new OA\Response(response: 404, description: 'Payment not found')
+        ]
+    )]
     public function callback(string $merchantOrderId): JsonResponse
     {
         Log::info('PhonePe redirect callback received', [
@@ -180,6 +254,26 @@ class PaymentController extends Controller
      *
      * POST /api/webhook/phonepe
      */
+    #[OA\Post(
+        path: '/api/webhook/phonepe',
+        summary: 'PhonePe Webhook',
+        description: 'Handle PhonePe server-to-server webhook notification.',
+        tags: ['Payment'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'response', type: 'string', description: 'Base64 encoded payload')
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Webhook processed successfully'),
+            new OA\Response(response: 400, description: 'Invalid webhook payload - order ID missing'),
+            new OA\Response(response: 401, description: 'Invalid webhook signature'),
+            new OA\Response(response: 500, description: 'Webhook processing failed')
+        ]
+    )]
     public function webhook(Request $request): JsonResponse
     {
         Log::info('PhonePe webhook received', [
@@ -229,6 +323,22 @@ class PaymentController extends Controller
      *
      * GET /api/payment/status/{merchantOrderId}
      */
+    #[OA\Get(
+        path: '/api/payment/status/{merchantOrderId}',
+        summary: 'Check Payment Status',
+        description: 'Manually check and sync payment status from PhonePe.',
+        tags: ['Payment'],
+        parameters: [
+            new OA\Parameter(name: 'merchantOrderId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Payment status returned successfully'),
+            new OA\Response(response: 202, description: 'Payment is being processed'),
+            new OA\Response(response: 400, description: 'Payment declined or errored'),
+            new OA\Response(response: 404, description: 'Payment not found'),
+            new OA\Response(response: 500, description: 'Status check error')
+        ]
+    )]
     public function checkPaymentStatus(string $merchantOrderId): JsonResponse
     {
         try {
@@ -276,6 +386,29 @@ class PaymentController extends Controller
      *
      * GET /api/transactions
      */
+    #[OA\Get(
+        path: '/api/transactions',
+        summary: 'List All Transactions',
+        description: 'Return a paginated list of all payment records.',
+        tags: ['Payment'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Transactions fetched successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Transactions fetched successfully'),
+                        new OA\Property(property: 'data', type: 'object', properties: [
+                            new OA\Property(property: 'current_page', type: 'integer', example: 1),
+                            new OA\Property(property: 'data', type: 'array', items: new OA\Items(type: 'object')),
+                            new OA\Property(property: 'total', type: 'integer', example: 50)
+                        ])
+                    ]
+                )
+            )
+        ]
+    )]
     public function getAllTransactions(): JsonResponse
     {
         $payments = Payment::latest()->paginate(20);

@@ -316,6 +316,8 @@ class PhonepeServices
             return PaymentStatus::ERROR->value;
         }
 
+        Log::error($phonepeStatus);
+
         return match (strtoupper($phonepeStatus)) {
             'SUCCESS', 'COMPLETED', 'PAYMENT_SUCCESS' => PaymentStatus::COMPLETED->value,
             'PENDING', 'PAYMENT_PENDING'               => PaymentStatus::PENDING->value,

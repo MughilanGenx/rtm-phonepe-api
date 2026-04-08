@@ -1,0 +1,325 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "PhonePe Payment Gateway API",
+        "description": "API Documentation for PhonePe Payment Integration",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/generate-payment-link": {
+            "post": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Generate Payment Link",
+                "description": "Create a pending payment record and return a local shareable link.",
+                "operationId": "65e4b3b75c5ae7adcc3e27058d5771f5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "amount",
+                                    "customer_name",
+                                    "customer_email",
+                                    "customer_phone"
+                                ],
+                                "properties": {
+                                    "amount": {
+                                        "type": "number",
+                                        "example": 100,
+                                        "minimum": 1
+                                    },
+                                    "merchant_order_id": {
+                                        "type": "string",
+                                        "example": "ORDER_12345",
+                                        "nullable": true
+                                    },
+                                    "customer_name": {
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "customer_email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "john@example.com"
+                                    },
+                                    "customer_phone": {
+                                        "type": "string",
+                                        "example": "9876543210"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Payment link generated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Payment link generated successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "payment_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "merchant_order_id": {
+                                                    "type": "string",
+                                                    "example": "ORDER_12345"
+                                                },
+                                                "payment_link": {
+                                                    "type": "string",
+                                                    "example": "http://localhost/api/pay/ORDER_12345"
+                                                },
+                                                "customer_name": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "customer_email": {
+                                                    "type": "string",
+                                                    "example": "john@example.com"
+                                                },
+                                                "customer_phone": {
+                                                    "type": "string",
+                                                    "example": "9876543210"
+                                                },
+                                                "amount": {
+                                                    "type": "number",
+                                                    "example": 100
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "example": "INITIATED"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    }
+                }
+            }
+        },
+        "/api/pay/{merchantOrderId}": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Process Shared Link",
+                "description": "Look up the payment and redirect the user to PhonePe checkout.",
+                "operationId": "48d905dc1bee91a1251f2201ce245761",
+                "parameters": [
+                    {
+                        "name": "merchantOrderId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to PhonePe checkout"
+                    },
+                    "404": {
+                        "description": "Payment not found"
+                    },
+                    "400": {
+                        "description": "Payment link already used"
+                    },
+                    "502": {
+                        "description": "Payment initiation failed"
+                    }
+                }
+            }
+        },
+        "/api/payment/callback/{merchantOrderId}": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "PhonePe Redirect Callback",
+                "description": "Handle PhonePe browser redirect after the user completes or abandons payment.",
+                "operationId": "7711f97459521f262994dbda09f5353d",
+                "parameters": [
+                    {
+                        "name": "merchantOrderId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Payment verified successfully"
+                    },
+                    "202": {
+                        "description": "Payment is still being processed"
+                    },
+                    "400": {
+                        "description": "Payment declined, cancelled, or error"
+                    },
+                    "404": {
+                        "description": "Payment not found"
+                    }
+                }
+            }
+        },
+        "/api/webhook/phonepe": {
+            "post": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "PhonePe Webhook",
+                "description": "Handle PhonePe server-to-server webhook notification.",
+                "operationId": "a51b185fee6b86decd8d6a7fb2e2cec1",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "response": {
+                                        "description": "Base64 encoded payload",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Webhook processed successfully"
+                    },
+                    "400": {
+                        "description": "Invalid webhook payload - order ID missing"
+                    },
+                    "401": {
+                        "description": "Invalid webhook signature"
+                    },
+                    "500": {
+                        "description": "Webhook processing failed"
+                    }
+                }
+            }
+        },
+        "/api/payment/status/{merchantOrderId}": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Check Payment Status",
+                "description": "Manually check and sync payment status from PhonePe.",
+                "operationId": "32800f625a27a94f25ae76865f180287",
+                "parameters": [
+                    {
+                        "name": "merchantOrderId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Payment status returned successfully"
+                    },
+                    "202": {
+                        "description": "Payment is being processed"
+                    },
+                    "400": {
+                        "description": "Payment declined or errored"
+                    },
+                    "404": {
+                        "description": "Payment not found"
+                    },
+                    "500": {
+                        "description": "Status check error"
+                    }
+                }
+            }
+        },
+        "/api/transactions": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "List All Transactions",
+                "description": "Return a paginated list of all payment records.",
+                "operationId": "5b52a85c7c2184a7eb583da9aa4737db",
+                "responses": {
+                    "200": {
+                        "description": "Transactions fetched successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Transactions fetched successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 50
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Payment",
+            "description": "PhonePe Payment API Endpoints"
+        }
+    ]
+}
