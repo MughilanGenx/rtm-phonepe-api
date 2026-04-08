@@ -382,15 +382,22 @@ class PaymentController extends Controller
     // =========================================================================
 
     /**
-     * Return a paginated list of all payment records.
+     * Return a paginated list of all payment records with search and filters.
      *
      * GET /api/transactions
      */
     #[OA\Get(
         path: '/api/transactions',
         summary: 'List All Transactions',
-        description: 'Return a paginated list of all payment records.',
+        description: 'Return a paginated list of all payment records. Supports search, status filtering, date range filtering, and pagination.',
         tags: ['Payment'],
+        parameters: [
+            new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search by order ID, name, email, phone, or transaction ID', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'status', in: 'query', required: false, description: 'Filter by payment status (e.g., INIT, COMPLETED, PENDING, DECLINED, CANCELLED)', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'from_date', in: 'query', required: false, description: 'Start date (YYYY-MM-DD)', schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'to_date', in: 'query', required: false, description: 'End date (YYYY-MM-DD)', schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'per_page', in: 'query', required: false, description: 'Items per page (default: 10)', schema: new OA\Schema(type: 'integer', default: 10))
+        ],
         responses: [
             new OA\Response(
                 response: 200,
@@ -409,9 +416,40 @@ class PaymentController extends Controller
             )
         ]
     )]
-    public function getAllTransactions(): JsonResponse
+    public function getAllTransactions(Request $request): JsonResponse
     {
-        $payments = Payment::latest()->paginate(20);
+        $query = Payment::query();
+
+        // 1. Search by generic terms (name, email, phone, order ID, or transaction ID)
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('merchant_order_id', 'like', "%{$searchTerm}%")
+                  ->orWhere('customer_name', 'like', "%{$searchTerm}%")
+                  ->orWhere('customer_email', 'like', "%{$searchTerm}%")
+                  ->orWhere('customer_phone', 'like', "%{$searchTerm}%")
+                  ->orWhere('transaction_id', 'like', "%{$searchTerm}%");
+            });
+        }
+
+        // 2. Filter by status
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // 3. Filter by Date Range
+        if ($request->filled('from_date')) {
+            $query->whereDate('created_at', '>=', $request->from_date);
+        }
+        
+        if ($request->filled('to_date')) {
+            $query->whereDate('created_at', '<=', $request->to_date);
+        }
+
+        // Configure pagination (default to 10 if not provided)
+        $perPage = $request->input('per_page', 10);
+        
+        $payments = $query->latest()->paginate($perPage);
 
         return $this->success('Transactions fetched successfully', $payments);
     }
