@@ -6,6 +6,82 @@
         "version": "1.0.0"
     },
     "paths": {
+        "/api/login": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "User Login",
+                "description": "Authenticate a user and return a JWT token.",
+                "operationId": "c373bc4cffa4a56fc64e3979b8ee7b96",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "password"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "user@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "secret"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Login successful"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "token": {
+                                                    "type": "string",
+                                                    "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                                                },
+                                                "user": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials"
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    }
+                }
+            }
+        },
         "/api/generate-payment-link": {
             "post": {
                 "tags": [
@@ -159,7 +235,7 @@
                     "Payment"
                 ],
                 "summary": "PhonePe Redirect Callback",
-                "description": "Handle PhonePe browser redirect after the user completes or abandons payment.",
+                "description": "Handles PhonePe browser redirect after payment. Performs a server-to-server status verification, updates the DB, then redirects the frontend to /payment/status with query params: orderId, status (COMPLETED|PENDING|DECLINED|CANCELLED|ERROR), amount, transactionId, paidAt. On failure, an extra `error` param is included and status defaults to PENDING.",
                 "operationId": "7711f97459521f262994dbda09f5353d",
                 "parameters": [
                     {
@@ -173,7 +249,7 @@
                 ],
                 "responses": {
                     "302": {
-                        "description": "Redirect to frontend application"
+                        "description": "Redirect to {FRONTEND_URL}/payment/status?orderId=&status=&amount=&transactionId=&paidAt="
                     }
                 }
             }
@@ -358,6 +434,10 @@
         }
     },
     "tags": [
+        {
+            "name": "Auth",
+            "description": "Authentication API Endpoints"
+        },
         {
             "name": "Payment",
             "description": "PhonePe Payment API Endpoints"
