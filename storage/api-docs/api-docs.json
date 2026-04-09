@@ -230,13 +230,13 @@
             }
         },
         "/api/payment/callback/{merchantOrderId}": {
-            "get": {
+            "post": {
                 "tags": [
                     "Payment"
                 ],
                 "summary": "PhonePe Redirect Callback",
                 "description": "Handles PhonePe browser redirect after payment. Performs a server-to-server status verification, updates the DB, then redirects the frontend to /payment/status with query params: orderId, status (COMPLETED|PENDING|DECLINED|CANCELLED|ERROR), amount, transactionId, paidAt. On failure, an extra `error` param is included and status defaults to PENDING.",
-                "operationId": "7711f97459521f262994dbda09f5353d",
+                "operationId": "220072c31434ea471f6ba3ee9f4a4622",
                 "parameters": [
                     {
                         "name": "merchantOrderId",
@@ -247,6 +247,30 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "properties": {
+                                    "transactionId": {
+                                        "type": "string"
+                                    },
+                                    "merchantId": {
+                                        "type": "string"
+                                    },
+                                    "providerReferenceId": {
+                                        "type": "string"
+                                    },
+                                    "code": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "302": {
                         "description": "Redirect to {FRONTEND_URL}/payment/status?orderId=&status=&amount=&transactionId=&paidAt="
@@ -429,7 +453,140 @@
                             }
                         }
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/transactions/{orderId}": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Get Transaction by Order ID",
+                "description": "Fetch complete details of a specific payment transaction using its merchant order ID.",
+                "operationId": "96c5a280c51eba4d62cb8a54f20ad879",
+                "parameters": [
+                    {
+                        "name": "orderId",
+                        "in": "path",
+                        "description": "Merchant Order ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Transaction fetched successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Transaction fetched successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 17
+                                                    },
+                                                    "merchant_order_id": {
+                                                        "type": "string",
+                                                        "example": "ORDER_69D7771BBF"
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "lee"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "format": "email",
+                                                        "example": "test@gmail.com"
+                                                    },
+                                                    "phone": {
+                                                        "type": "string",
+                                                        "example": "9999233434"
+                                                    },
+                                                    "amount": {
+                                                        "type": "string",
+                                                        "example": "11.00"
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "example": "completed"
+                                                    },
+                                                    "payment_response": {
+                                                        "description": "Raw response from PhonePe",
+                                                        "type": "object",
+                                                        "example": {
+                                                            "state": "COMPLETED",
+                                                            "amount": 1100,
+                                                            "orderId": "OMO2604091523459403481676",
+                                                            "currency": "INR",
+                                                            "payableAmount": 1100
+                                                        }
+                                                    },
+                                                    "last_synced_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2026-04-09T09:54:54.000000Z"
+                                                    },
+                                                    "paid_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2026-04-09T09:54:54.000000Z"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2026-04-09T09:53:31.000000Z"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2026-04-09T09:54:54.000000Z"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Transaction not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
             }
         }
     },

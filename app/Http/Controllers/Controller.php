@@ -9,6 +9,12 @@ use OpenApi\Attributes as OA;
     title: "PhonePe Payment Gateway API",
     description: "API Documentation for PhonePe Payment Integration"
 )]
+#[OA\SecurityScheme(
+    securityScheme: 'bearerAuth',
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT'
+)]
 abstract class Controller
 {
     //

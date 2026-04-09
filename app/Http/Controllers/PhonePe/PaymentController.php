@@ -20,22 +20,6 @@ class PaymentController extends Controller
 
     public function __construct(private PhonepeServices $phonePe) {}
 
-    // =========================================================================
-    // 1. Generate Payment Link
-    // =========================================================================
-
-    /**
-     * Create a pending payment record and return a local shareable link.
-     *
-     * POST /api/generate-payment-link
-     *
-     * Body:
-     *   amount          (required, numeric, min:1)
-     *   merchant_order_id (optional — auto-generated if omitted)
-     *   name            (required)
-     *   email           (required, email)
-     *   phone           (required)
-     */
     #[OA\Post(
         path: '/api/generate-payment-link',
         summary: 'Generate Payment Link',
@@ -122,15 +106,7 @@ class PaymentController extends Controller
         ]);
     }
 
-    // =========================================================================
-    // 2. Process Shared Link (redirect user to PhonePe)
-    // =========================================================================
-
-    /**
-     * Look up the payment and redirect the user to PhonePe's checkout.
-     *
-     * GET /api/pay/{merchantOrderId}
-     */
+  
     #[OA\Get(
         path: '/api/pay/{merchantOrderId}',
         summary: 'Process Shared Link',
@@ -152,7 +128,6 @@ class PaymentController extends Controller
 
         $payment = Payment::where('merchant_order_id', $merchantOrderId)->first();
 
-        // ── Payment not found ──────────────────────────────────────────────────
         if (! $payment) {
             Log::error('Payment not found for shared link', ['merchant_order_id' => $merchantOrderId]);
             return redirect()->away(
@@ -164,7 +139,6 @@ class PaymentController extends Controller
             );
         }
 
-        // ── Already used / terminal status ─────────────────────────────────────
         if ($payment->status !== PaymentStatus::INITIATED) {
             Log::info('Payment already processed, redirecting to status page', [
                 'merchant_order_id' => $merchantOrderId,
@@ -184,13 +158,11 @@ class PaymentController extends Controller
             );
         }
 
-        // ── Re-use existing PhonePe link (idempotent) ──────────────────────────
         if ($payment->phonepe_link) {
             Log::info('Reusing existing PhonePe link', ['merchant_order_id' => $merchantOrderId]);
             return redirect()->away($payment->phonepe_link);
         }
 
-        // ── Initiate payment with PhonePe ──────────────────────────────────────
         try {
             $response = $this->phonePe->initiatePayment([
                 'merchant_order_id' => $merchantOrderId,
@@ -239,18 +211,7 @@ class PaymentController extends Controller
     }
 
 
-    // =========================================================================
-    // 3. Redirect Callback (PhonePe redirect after payment)
-    // =========================================================================
-
-    /**
-     * Handle PhonePe's browser redirect after the user completes (or abandons) payment.
-     * PhonePe sends the merchantOrderId via URL param — do NOT trust this status alone;
-     * always verify via server-to-server status check.
-     *
-     * GET /api/payment/callback/{merchantOrderId}
-     */
-    #[OA\Get(
+    #[OA\Post(
         path: '/api/payment/callback/{merchantOrderId}',
         summary: 'PhonePe Redirect Callback',
         description: 'Handles PhonePe browser redirect after payment. Performs a server-to-server status verification, updates the DB, then redirects the frontend to /payment/status with query params: orderId, status (COMPLETED|PENDING|DECLINED|CANCELLED|ERROR), amount, transactionId, paidAt. On failure, an extra `error` param is included and status defaults to PENDING.',
@@ -258,6 +219,20 @@ class PaymentController extends Controller
         parameters: [
             new OA\Parameter(name: 'merchantOrderId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
         ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\MediaType(
+                mediaType: 'application/x-www-form-urlencoded',
+                schema: new OA\Schema(
+                    properties: [
+                        new OA\Property(property: 'transactionId', type: 'string'),
+                        new OA\Property(property: 'merchantId', type: 'string'),
+                        new OA\Property(property: 'providerReferenceId', type: 'string'),
+                        new OA\Property(property: 'code', type: 'string'),
+                    ]
+                )
+            )
+        ),
         responses: [
             new OA\Response(
                 response: 302,
@@ -311,16 +286,6 @@ class PaymentController extends Controller
         return redirect()->away($frontendUrl . '/payment/status?' . http_build_query($queryParams));
     }
 
-    // =========================================================================
-    // 4. Webhook (server-to-server from PhonePe)
-    // =========================================================================
-
-    /**
-     * Handle PhonePe server-to-server webhook notification.
-     * Validates HMAC signature before processing.
-     *
-     * POST /api/webhook/phonepe
-     */
     #[OA\Post(
         path: '/api/webhook/phonepe',
         summary: 'PhonePe Webhook',
@@ -381,15 +346,7 @@ class PaymentController extends Controller
         }
     }
 
-    // =========================================================================
-    // 5. Manual Status Check
-    // =========================================================================
 
-    /**
-     * Manually check and sync payment status from PhonePe.
-     *
-     * GET /api/payment/status/{merchantOrderId}
-     */
     #[OA\Get(
         path: '/api/payment/status/{merchantOrderId}',
         summary: 'Check Payment Status',
@@ -444,20 +401,12 @@ class PaymentController extends Controller
         }
     }
 
-    // =========================================================================
-    // 6. List All Transactions
-    // =========================================================================
-
-    /**
-     * Return a paginated list of all payment records with search and filters.
-     *
-     * GET /api/transactions
-     */
     #[OA\Get(
         path: '/api/transactions',
         summary: 'List All Transactions',
         description: 'Return a paginated list of all payment records. Supports search, status filtering, date range filtering, and pagination.',
         tags: ['Payment'],
+        security: [['bearerAuth' => []]],
         parameters: [
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search by order ID, name, email, phone, or transaction ID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'status', in: 'query', required: false, description: 'Filter by payment status (e.g., INIT, COMPLETED, PENDING, DECLINED, CANCELLED)', schema: new OA\Schema(type: 'string')),
@@ -521,14 +470,96 @@ class PaymentController extends Controller
         return $this->success('Transactions fetched successfully', $payments);
     }
 
-    // =========================================================================
-    // Private Helpers
-    // =========================================================================
 
-    /**
-     * Core payment verification logic shared by callback, webhook, and status check.
-     * Performs server-to-server status verification with PhonePe and updates DB atomically.
-     */
+    #[OA\Get(
+        path: '/api/transactions/{orderId}',
+        summary: 'Get Transaction by Order ID',
+        description: 'Fetch complete details of a specific payment transaction using its merchant order ID.',
+        tags: ['Payment'],
+        security: [['bearerAuth' => []]],
+        parameters: [
+            new OA\Parameter(name: 'orderId', in: 'path', required: true, description: 'Merchant Order ID', schema: new OA\Schema(type: 'string'))
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Transaction fetched successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Transaction fetched successfully'),
+                        new OA\Property(
+                            property: 'data',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer', example: 17),
+                                    new OA\Property(property: 'merchant_order_id', type: 'string', example: 'ORDER_69D7771BBF'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'lee'),
+                                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'test@gmail.com'),
+                                    new OA\Property(property: 'phone', type: 'string', example: '9999233434'),
+                                    new OA\Property(property: 'amount', type: 'string', example: '11.00'),
+                                    new OA\Property(property: 'status', type: 'string', example: 'completed'),
+                                    new OA\Property(
+                                        property: 'payment_response',
+                                        type: 'object',
+                                        description: 'Raw response from PhonePe',
+                                        example: [
+                                            'state' => 'COMPLETED',
+                                            'amount' => 1100,
+                                            'orderId' => 'OMO2604091523459403481676',
+                                            'currency' => 'INR',
+                                            'payableAmount' => 1100
+                                        ]
+                                    ),
+                                    new OA\Property(property: 'last_synced_at', type: 'string', format: 'date-time', example: '2026-04-09T09:54:54.000000Z'),
+                                    new OA\Property(property: 'paid_at', type: 'string', format: 'date-time', example: '2026-04-09T09:54:54.000000Z'),
+                                    new OA\Property(property: 'created_at', type: 'string', format: 'date-time', example: '2026-04-09T09:53:31.000000Z'),
+                                    new OA\Property(property: 'updated_at', type: 'string', format: 'date-time', example: '2026-04-09T09:54:54.000000Z'),
+                                ]
+                            )
+                        )
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Transaction not found')
+        ]
+    )]
+    public function getTransactionById(string $orderId): JsonResponse
+    {
+        $payment = Payment::where('merchant_order_id', $orderId)->first();
+
+        if (! $payment) {
+            return $this->error('Transaction not found', 404, 'TRANSACTION_NOT_FOUND');
+        }
+
+        $responseData = $payment->only([
+            'id',
+            'merchant_order_id',
+            'name',
+            'email',
+            'phone',
+            'amount',
+            'status',
+            'payment_response',
+            'last_synced_at',
+            'paid_at',
+            'created_at',
+            'updated_at',
+        ]);
+
+        if (isset($responseData['payment_response']['paymentDetails'])) {
+            unset($responseData['payment_response']['paymentDetails']);
+        }
+        if (isset($responseData['payment_response']['phonepeTPAPTxnDetailsLink'])) {
+            unset($responseData['payment_response']['phonepeTPAPTxnDetailsLink']);
+        }
+
+        return $this->success('Transaction fetched successfully', [$responseData]);
+    }
+
+
     private function verifyAndUpdatePayment(string $merchantOrderId): JsonResponse
     {
         // Fetch payment record
@@ -569,9 +600,6 @@ class PaymentController extends Controller
         return $this->buildPaymentStatusResponse($payment);
     }
 
-    /**
-     * Build a standardised JSON response based on the current payment status.
-     */
     private function buildPaymentStatusResponse(Payment $payment): JsonResponse
     {
         $data = [

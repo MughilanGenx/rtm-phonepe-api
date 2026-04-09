@@ -29,4 +29,7 @@ Route::post('/login', [AuthController::class, 'login'])
 Route::middleware('auth:api')->group(function () {
     Route::get('/transactions', [PaymentController::class, 'getAllTransactions'])
         ->name('payment.transactions');
+
+    Route::get('/transactions/{orderId}', [PaymentController::class, 'getTransactionById'])
+        ->name('payment.transaction.show');
 });
