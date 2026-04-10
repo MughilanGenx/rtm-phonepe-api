@@ -22,12 +22,8 @@ class PhonepeServices
         $this->clientSecret  = config('services.phonepe.client_secret');
         $this->clientVersion = config('services.phonepe.client_version', '1');
         $this->baseUrl       = config('services.phonepe.base_url');
-        $this->webhookSecret = config('services.phonepe.webhook_secret'); // Optional: for HMAC validation
+        $this->webhookSecret = config('services.phonepe.webhook_secret'); 
     }
-
-    // -------------------------------------------------------------------------
-    // Authentication
-    // -------------------------------------------------------------------------
 
     /**
      * Retrieve a cached OAuth access token from PhonePe.
@@ -59,10 +55,6 @@ class PhonepeServices
             return $response->json()['access_token'];
         });
     }
-
-    // -------------------------------------------------------------------------
-    // Payment Initiation
-    // -------------------------------------------------------------------------
 
     /**
      * Initiate a PhonePe checkout payment.
@@ -124,10 +116,6 @@ class PhonepeServices
 
         return $json;
     }
-
-    // -------------------------------------------------------------------------
-    // Status Check
-    // -------------------------------------------------------------------------
 
     /**
      * Query PhonePe for the current order status.
@@ -192,10 +180,6 @@ class PhonepeServices
 
         return $json;
     }
-
-    // -------------------------------------------------------------------------
-    // Payload Processing
-    // -------------------------------------------------------------------------
 
     /**
      * Decode a PhonePe base64-encoded `response` field if present.
@@ -264,10 +248,6 @@ class PhonepeServices
         return $attrs;
     }
 
-    // -------------------------------------------------------------------------
-    // Webhook Signature Validation
-    // -------------------------------------------------------------------------
-
     /**
      * Validate PhonePe webhook HMAC-SHA256 signature.
      *
@@ -302,10 +282,6 @@ class PhonepeServices
 
         return $valid;
     }
-
-    // -------------------------------------------------------------------------
-    // Internal Helpers
-    // -------------------------------------------------------------------------
 
     /**
      * Map PhonePe status strings to application PaymentStatus enum values.
