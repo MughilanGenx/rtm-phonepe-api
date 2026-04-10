@@ -43,6 +43,8 @@ return [
         'env'            => env('PHONEPE_ENV', 'sandbox'),
         'webhook_secret' => env('PHONEPE_WEBHOOK_SECRET'), // Used for HMAC signature validation
 
+        'redirect_url'   => env('PHONEPE_REDIRECT_URL', env('FRONTEND_URL') . '/payment/status'),
+
         'base_url' => env('PHONEPE_ENV', 'sandbox') === 'production'
             ? 'https://api.phonepe.com/apis/pg'
             : 'https://api-preprod.phonepe.com/apis/pg-sandbox',

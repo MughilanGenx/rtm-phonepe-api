@@ -89,7 +89,7 @@ class PhonepeServices
                 'message' => 'Payment for order ' . $data['merchant_order_id'],
                 'merchantUrls' => [
                     // PhonePe will GET this URL when the user completes/cancels payment
-                    'redirectUrl' => url('/api/payment/callback/' . $data['merchant_order_id']),
+                    'redirectUrl' => config('services.phonepe.redirect_url') . '?orderId=' . $data['merchant_order_id'],
                 ],
             ],
         ];
