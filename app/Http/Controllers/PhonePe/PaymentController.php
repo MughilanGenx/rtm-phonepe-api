@@ -602,6 +602,28 @@ class PaymentController extends Controller
 
     private function buildPaymentStatusResponse(Payment $payment): JsonResponse
     {
+        $responseData = $payment->only([
+            'id',
+            'merchant_order_id',
+            'name',
+            'email',
+            'phone',
+            'amount',
+            'status',
+            'payment_response',
+            'last_synced_at',
+            'paid_at',
+            'created_at',
+            'updated_at',
+        ]);
+
+        if (isset($responseData['payment_response']['paymentDetails'])) {
+            unset($responseData['payment_response']['paymentDetails']);
+        }
+        if (isset($responseData['payment_response']['phonepeTPAPTxnDetailsLink'])) {
+            unset($responseData['payment_response']['phonepeTPAPTxnDetailsLink']);
+        }
+
         $data = [
             'transaction_id'    => $payment->transaction_id,
             'amount'            => $payment->amount,
@@ -609,6 +631,7 @@ class PaymentController extends Controller
             'payment_id'        => $payment->id,
             'merchant_order_id' => $payment->merchant_order_id,
             'paid_at'           => $payment->paid_at?->toISOString(),
+            'transaction'       => $responseData,
         ];
 
         return match ($payment->status) {
