@@ -6,7 +6,7 @@ use Illuminate\Http\JsonResponse;
 
 trait ApiResponse
 {
-    public function success( $message = 'Success',$data = null, $code = 200, $status = 'PAYMENT_SUCCESS'): JsonResponse
+    public function success( $message = 'Success',$data = null, $code = 200, $status = null): JsonResponse
     {
         return response()->json([
             'success' => true,
@@ -16,7 +16,7 @@ trait ApiResponse
         ], $code);
     }
 
-    public function error($message = 'Error occurred', $code = 400, $status = 'PAYMENT_ERROR', $data = null): JsonResponse
+    public function error($message = 'Error occurred', $code = 400, $status = null, $data = null): JsonResponse
     {
         return response()->json([
             'success' => false,
@@ -27,7 +27,7 @@ trait ApiResponse
     }
 
 
-    public function pending($data = null, $message = 'Payment is pending', $code = 202, $status = 'PAYMENT_PENDING'): JsonResponse
+    public function pending($data = null, $message = 'Payment is pending', $code = 202, $status = null): JsonResponse
     {
         return response()->json([
             'success' => true,

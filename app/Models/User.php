@@ -24,6 +24,16 @@ class User extends Authenticatable implements JWTSubject
         'name',
         'email',
         'password',
+        'profile_image',
+    ];
+
+    /**
+     * The attributes that should be appended to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = [
+        'profile_image_url',
     ];
 
     /**
@@ -67,5 +77,19 @@ class User extends Authenticatable implements JWTSubject
     public function getJWTCustomClaims()
     {
         return [];
+    }
+
+    /**
+     * Get the full URL for the profile image.
+     *
+     * @return string|null
+     */
+    public function getProfileImageUrlAttribute(): ?string
+    {
+        if ($this->profile_image) {
+            return asset('storage/profile_images/' . $this->profile_image);
+        }
+
+        return null;
     }
 }

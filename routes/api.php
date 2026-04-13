@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\PhonePe\PaymentController;
+use App\Http\Controllers\User\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/generate-payment-link', [PaymentController::class, 'generatePaymentLink'])
@@ -33,6 +34,21 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/transactions', [PaymentController::class, 'getAllTransactions'])
         ->name('payment.transactions');
 
-    Route::get('/transactions/{orderId}', [PaymentController::class, 'getTransactionById'])
-        ->name('payment.transaction.show');
+    Route::prefix('user')->group(function () {
+
+        Route::get('/profile', [UserManagementController::class, 'profileManagement'])
+            ->name('profile');
+
+        Route::post('/profile', [UserManagementController::class, 'updateProfileManagement'])
+            ->name('profile.update');
+
+        Route::post('/profile/change-password', [UserManagementController::class, 'changePasswordManagement'])
+            ->name('profile.change-password');
+
+        Route::post('/profile/upload-profile-image', [UserManagementController::class, 'uploadUserProfile'])
+            ->name('profile.upload-profile-image');
+    });
 });
+
+Route::get('/transactions/{orderId}', [PaymentController::class, 'getTransactionById'])
+    ->name('payment.transaction.show');

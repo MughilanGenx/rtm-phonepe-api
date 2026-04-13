@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use App\Enums\PaymentStatus;
 
 return new class extends Migration
 {
@@ -14,11 +15,11 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
             $table->string('merchant_order_id');
-            $table->string('name');
-            $table->string('email');
-            $table->string('phone');
+            $table->string('name')->nullable();
+            $table->string('email')->nullable();
+            $table->string('phone')->nullable();
             $table->decimal('amount', 10, 2);
-            $table->string('status')->default(\App\Enums\PaymentStatus::INITIATED->value);
+            $table->string('status')->default(PaymentStatus::INITIATED->value);
             $table->longText('phonepe_link')->nullable();
             $table->string('transaction_id')->nullable();
             $table->string('phonepe_order_id')->nullable();
