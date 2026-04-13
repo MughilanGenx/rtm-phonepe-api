@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
+use Tymon\JWTAuth\Facades\JWTAuth;
 use OpenApi\Attributes as OA;
 
 #[OA\Tag(name: 'Auth', description: 'Authentication API Endpoints')]
@@ -70,5 +71,35 @@ class AuthController extends Controller
             'token' => $token,
             'user' => $user,
         ], 200, 'AUTH_SUCCESS');
+    }
+
+    #[OA\Post(
+        path: '/api/logout',
+        summary: 'User Logout',
+        description: 'Log out the user by invalidating the JWT token.',
+        security: [['bearerAuth' => []]],
+        tags: ['Auth'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Logout successful',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Logout successful'),
+                        new OA\Property(property: 'data', type: 'object', nullable: true, example: null)
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Unauthenticated')
+        ]
+    )]
+    public function logout() {
+        try {
+            JWTAuth::invalidate(JWTAuth::getToken());
+            return $this->success('Logout successful', null, 200, 'AUTH_LOGOUT');
+        } catch (\Exception $e) {
+            return $this->error('Failed to logout', 500, 'AUTH_ERROR');
+        }
     }
 }
