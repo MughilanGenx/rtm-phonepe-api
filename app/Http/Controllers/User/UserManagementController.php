@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\User;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -18,6 +18,56 @@ use OpenApi\Attributes as OA;
 class UserManagementController extends Controller
 {
     use ApiResponse;
+
+    #[OA\Get(
+        path: '/api/user/roles',
+        summary: 'List All Roles',
+        description: 'Fetch all available user roles with their labels.',
+        security: [['bearerAuth' => []]],
+        tags: ['User Management'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Roles fetched successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Roles fetched successfully'),
+                        new OA\Property(
+                            property: 'data',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'value', type: 'string', example: 'user'),
+                                    new OA\Property(property: 'label', type: 'string', example: 'User'),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+        ]
+    )]
+    public function index()
+    {
+        try {
+            $roles = collect(Role::cases())->map(fn ($role) => [
+                'value' => $role->value,
+            ]);
+
+        return $this->success('Roles fetched successfully', $roles);
+        }catch(\Exception $e){
+            Log::error('Error occurs while fetching the roles', [
+                'Message' => $e->getMessage(),
+                'File' => $e->getFile(),
+                'Line' => $e->getLine(),
+                'Trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->error('Internal server error', 500, 'INTERNAL_SERVER_ERROR');
+        }
+    }
 
     #[OA\Get(
         path: '/api/user/profile',
@@ -93,8 +143,8 @@ class UserManagementController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:125|unique:users,email,' . $user->id,
-            'phone' => 'nullable|string|max:15|unique:users,phone,' . $user->id,
+            'email' => 'nullable|email|max:125|unique:users,email,'.$user->id,
+            'phone' => 'nullable|string|max:15|unique:users,phone,'.$user->id,
         ]);
 
         if ($validator->fails()) {

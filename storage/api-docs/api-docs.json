@@ -127,6 +127,98 @@
                 ]
             }
         },
+        "/api/register": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register New User",
+                "description": "Register a new user with a specific role.",
+                "operationId": "81424f50e08930bcaa5c4c7710fb7b30",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name",
+                                    "email",
+                                    "phone",
+                                    "password",
+                                    "confirm_password",
+                                    "role"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Jane Doe"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "jane@example.com"
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "example": "9876543211"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "password123"
+                                    },
+                                    "confirm_password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "password123"
+                                    },
+                                    "role": {
+                                        "type": "string",
+                                        "example": "user",
+                                        "enum": [
+                                            "admin",
+                                            "user"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "User registered successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User registered successfully"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "400": {
+                        "description": "Passwords do not match"
+                    }
+                }
+            }
+        },
         "/api/generate-payment-link": {
             "post": {
                 "tags": [
@@ -236,8 +328,16 @@
                     },
                     "422": {
                         "description": "Validation Error"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/pay/{merchantOrderId}": {
@@ -616,6 +716,59 @@
                     },
                     "404": {
                         "description": "Transaction not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/user/roles": {
+            "get": {
+                "tags": [
+                    "User Management"
+                ],
+                "summary": "List All Roles",
+                "description": "Fetch all available user roles with their labels.",
+                "operationId": "ad7a783df9fa8b1b23c3bc4331fed673",
+                "responses": {
+                    "200": {
+                        "description": "Roles fetched successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Roles fetched successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string",
+                                                        "example": "user"
+                                                    },
+                                                    "label": {
+                                                        "type": "string",
+                                                        "example": "User"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [

@@ -11,6 +11,7 @@ class Payment extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'merchant_order_id',
         'name',
         'email',
@@ -31,4 +32,9 @@ class Payment extends Model
         'last_synced_at'   => 'datetime',
         'paid_at'          => 'datetime',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

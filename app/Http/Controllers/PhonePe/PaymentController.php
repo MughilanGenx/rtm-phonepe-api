@@ -25,6 +25,7 @@ class PaymentController extends Controller
         summary: 'Generate Payment Link',
         description: 'Create a pending payment record and return a local shareable link.',
         tags: ['Payment'],
+        security: [['bearerAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -59,16 +60,18 @@ class PaymentController extends Controller
                     ]
                 )
             ),
-            new OA\Response(response: 422, description: 'Validation Error')
+            new OA\Response(response: 422, description: 'Validation Error'),
+            new OA\Response(response: 401, description: 'Unauthorized')
         ]
     )]
     public function generatePaymentLink(Request $request): JsonResponse
     {
+        $user = auth('api')->user();
         $validator = Validator::make($request->all(), [
             'amount'            => 'required|numeric|min:1',
             'merchant_order_id' => 'nullable|string|max:255|unique:payments,merchant_order_id',
             'name'              => 'required|string|max:255',
-            'email'             => 'required|email|max:255',
+            'email'             => 'nullable|email|max:255',
             'phone'             => 'required|string|max:15',
         ]);
 
@@ -80,6 +83,7 @@ class PaymentController extends Controller
             ?? 'ORDER_' . strtoupper(substr(uniqid('', true), 0, 10));
 
         $payment = Payment::create([
+            'user_id'           => $user->id,
             'merchant_order_id' => $merchantOrderId,
             'amount'            => $request->amount,
             'name'              => $request->name,
@@ -90,6 +94,7 @@ class PaymentController extends Controller
 
         Log::info('Payment record created', [
             'payment_id'        => $payment->id,
+            'user_id'           => $payment->user_id,
             'merchant_order_id' => $merchantOrderId,
             'amount'            => $payment->amount,
         ]);

@@ -5,8 +5,7 @@ use App\Http\Controllers\PhonePe\PaymentController;
 use App\Http\Controllers\User\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/generate-payment-link', [PaymentController::class, 'generatePaymentLink'])
-    ->name('payment.generate');
+
 
 Route::get('/pay/{merchantOrderId}', [PaymentController::class, 'processSharedLink'])
     ->name('payment.process')
@@ -27,7 +26,13 @@ Route::post('/webhook/phonepe', [PaymentController::class, 'webhook'])
 Route::post('/login', [AuthController::class, 'login'])
     ->name('login');
 
+Route::post('/register', [AuthController::class, 'registerNewUser'])
+    ->name('register');
+
 Route::middleware('auth:api')->group(function () {
+    Route::post('/generate-payment-link', [PaymentController::class, 'generatePaymentLink'])
+        ->name('payment.generate');
+
     Route::post('/logout', [AuthController::class, 'logout'])
         ->name('logout');
 
@@ -35,6 +40,8 @@ Route::middleware('auth:api')->group(function () {
         ->name('payment.transactions');
 
     Route::prefix('user')->group(function () {
+        Route::get('/roles', [UserManagementController::class, 'index'])
+            ->name('user.roles');
 
         Route::get('/profile', [UserManagementController::class, 'profileManagement'])
             ->name('profile');

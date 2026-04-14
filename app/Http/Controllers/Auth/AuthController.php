@@ -2,19 +2,23 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\Role;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use App\Models\User;
-use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Validation\Rules\Enum;
 use OpenApi\Attributes as OA;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 #[OA\Tag(name: 'Auth', description: 'Authentication API Endpoints')]
 class AuthController extends Controller
 {
     use ApiResponse;
+
     #[OA\Post(
         path: '/api/login',
         summary: 'User Login',
@@ -40,16 +44,17 @@ class AuthController extends Controller
                         new OA\Property(property: 'message', type: 'string', example: 'Login successful'),
                         new OA\Property(property: 'data', type: 'object', properties: [
                             new OA\Property(property: 'token', type: 'string', example: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'),
-                            new OA\Property(property: 'user', type: 'object')
-                        ])
+                            new OA\Property(property: 'user', type: 'object'),
+                        ]),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Invalid credentials'),
-            new OA\Response(response: 422, description: 'Validation Error')
+            new OA\Response(response: 422, description: 'Validation Error'),
         ]
     )]
-    public function login(Request $request) {
+    public function login(Request $request)
+    {
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
             'password' => 'required',
@@ -59,18 +64,30 @@ class AuthController extends Controller
             return $this->error($validator->errors()->first(), 422, 'VALIDATION_ERROR');
         }
 
-        $user = User::where('email', $request->email)->first();
+        try {
+            $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return $this->error('Invalid credentials', 401, 'AUTH_ERROR');
+            if (! $user || ! Hash::check($request->password, $user->password)) {
+                return $this->error('Invalid credentials', 401, 'AUTH_ERROR');
+            }
+
+            $token = JWTAuth::fromUser($user);
+
+            return $this->success('Login successful', [
+                'token' => $token,
+                'user' => $user,
+            ], 200, 'AUTH_SUCCESS');
+
+        } catch (\Exception $e) {
+            Log::error('Error occurs while login the user', [
+                'Message' => $e->getMessage(),
+                'File' => $e->getFile(),
+                'Line' => $e->getLine(),
+                'Trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->error('Internal server error', 500, 'INTERNAL_SERVER_ERROR');
         }
-
-        $token = \Tymon\JWTAuth\Facades\JWTAuth::fromUser($user);
-
-        return $this->success('Login successful', [
-            'token' => $token,
-            'user' => $user,
-        ], 200, 'AUTH_SUCCESS');
     }
 
     #[OA\Post(
@@ -87,19 +104,101 @@ class AuthController extends Controller
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'message', type: 'string', example: 'Logout successful'),
-                        new OA\Property(property: 'data', type: 'object', nullable: true, example: null)
+                        new OA\Property(property: 'data', type: 'object', nullable: true, example: null),
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: 'Unauthenticated')
+            new OA\Response(response: 401, description: 'Unauthenticated'),
         ]
     )]
-    public function logout() {
+    public function logout()
+    {
         try {
             JWTAuth::invalidate(JWTAuth::getToken());
+
             return $this->success('Logout successful', null, 200, 'AUTH_LOGOUT');
         } catch (\Exception $e) {
             return $this->error('Failed to logout', 500, 'AUTH_ERROR');
+        }
+    }
+
+    #[OA\Post(
+        path: '/api/register',
+        summary: 'Register New User',
+        description: 'Register a new user with a specific role.',
+        tags: ['Auth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['name', 'email', 'phone', 'password', 'confirm_password', 'role'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', example: 'Jane Doe'),
+                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'jane@example.com'),
+                    new OA\Property(property: 'phone', type: 'string', example: '9876543211'),
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password123'),
+                    new OA\Property(property: 'confirm_password', type: 'string', format: 'password', example: 'password123'),
+                    new OA\Property(property: 'role', type: 'string', enum: ['admin', 'user'], example: 'user'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'User registered successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'User registered successfully'),
+                        new OA\Property(property: 'data', type: 'object'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 422, description: 'Validation Error'),
+            new OA\Response(response: 400, description: 'Passwords do not match'),
+        ]
+    )]
+    public function registerNewUser(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:50',
+            'email' => 'required|email|max:125|unique:users,email',
+            'phone' => 'nullable|string|max:15|unique:users,phone',
+            'password' => 'required|string|min:6|max:255',
+            'role' => ['required', new Enum(Role::class)],
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors(), 422, 'VALIDATION_ERROR');
+        }
+
+        try {
+            $data = $validator->validated();
+
+            // if ($data['password'] != $data['confirm_password']) {
+            //     return $this->error('Passwords do not match', 400, 'PASSWORDS_DO_NOT_MATCH');
+            // }
+
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'phone' => $data['phone'],
+                'role' => $data['role'],
+                'password' => Hash::make($data['password']),
+                'is_newUser' => true
+            ]);
+
+            return $this->success('User registered successfully', [
+                'user' => $user,
+            ], 200, 'USER_REGISTERED_SUCCESSFULLY');
+        } catch (\Exception $e) {
+            Log::error('Error occurs while register the user', [
+                'Message' => $e->getMessage(),
+                'File' => $e->getFile(),
+                'Line' => $e->getLine(),
+                'Trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->error('Internal server error', 500, 'INTERNAL_SERVER_ERROR');
         }
     }
 }
