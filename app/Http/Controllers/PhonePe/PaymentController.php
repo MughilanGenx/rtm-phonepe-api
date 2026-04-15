@@ -489,7 +489,7 @@ class PaymentController extends Controller
     )]
     public function getAllTransactions(Request $request): JsonResponse
     {
-        $query = Payment::query()->with('user:name,email');
+        $query = Payment::query()->with('user:id,name,email');
 
         // 1. Search by generic terms (name, email, phone, order ID, or transaction ID)
         if ($request->filled('search')) {
@@ -583,7 +583,7 @@ class PaymentController extends Controller
     )]
     public function getTransactionById(string $orderId): JsonResponse
     {
-        $payment = Payment::where('merchant_order_id', $orderId)->with('user:name')->first();
+        $payment = Payment::where('merchant_order_id', $orderId)->with('user:id,name')->first();
 
         if (! $payment) {
             return $this->error('Transaction not found', 404, 'TRANSACTION_NOT_FOUND');
