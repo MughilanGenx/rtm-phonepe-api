@@ -230,4 +230,79 @@ class AuthController extends Controller
             return $this->error('Internal server error', 500, 'INTERNAL_SERVER_ERROR');
         }
     }
+
+    #[OA\Post(
+        path: '/api/new-user-login',
+        summary: 'New User Password Setup',
+        description: 'Set a new password for a newly created user account.',
+        security: [['bearerAuth' => []]],
+        tags: ['Auth'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['password', 'confirm_password'],
+                properties: [
+                    new OA\Property(property: 'password', type: 'string', format: 'password', example: 'newpassword123'),
+                    new OA\Property(property: 'confirm_password', type: 'string', format: 'password', example: 'newpassword123'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'User password updated successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'User password updated successfully'),
+                        new OA\Property(property: 'data', type: 'object', properties: [
+                            new OA\Property(property: 'user', type: 'object'),
+                        ]),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Passwords do not match'),
+            new OA\Response(response: 422, description: 'Validation Error'),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
+        ]
+    )]
+    public function newUserLogin(Request $request){
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string|max:255',
+            'confirm_password' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors(), 422, 'VALIDATION_ERROR');
+        }
+
+        try {
+            $data = $validator->validated();
+
+            if ($data['password'] != $data['confirm_password']) {
+                return $this->error('Passwords do not match', 400, 'PASSWORDS_DO_NOT_MATCH');
+            }
+
+            $user = User::updateOrCreate([
+                'id' => auth('api')->user()->id,
+            ], [
+                'password' => Hash::make($data['password']),
+                'is_new_user' => false
+            ]);
+
+            return $this->success('User password updated successfully', [
+                'user' => $user,
+            ], 200, 'USER_PASSWORD_UPDATED_SUCCESSFULLY');
+        } catch (\Exception $e) {
+            Log::error('Error occurs while updating the user password', [
+                'Message' => $e->getMessage(),
+                'File' => $e->getFile(),
+                'Line' => $e->getLine(),
+                'Trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->error('Internal server error', 500, 'INTERNAL_SERVER_ERROR');
+        }
+    }
 }
