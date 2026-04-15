@@ -5,8 +5,6 @@ use App\Http\Controllers\PhonePe\PaymentController;
 use App\Http\Controllers\User\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
-
-
 Route::get('/pay/{merchantOrderId}', [PaymentController::class, 'processSharedLink'])
     ->name('payment.process')
     ->withoutMiddleware(['auth']);
@@ -26,15 +24,15 @@ Route::post('/webhook/phonepe', [PaymentController::class, 'webhook'])
 Route::post('/login', [AuthController::class, 'login'])
     ->name('login');
 
-Route::post('/register', [AuthController::class, 'registerNewUser'])
-    ->name('register');
-
 Route::middleware('auth:api')->group(function () {
-    Route::post('/generate-payment-link', [PaymentController::class, 'generatePaymentLink'])
-        ->name('payment.generate');
+    Route::post('/register', [AuthController::class, 'registerNewUser'])
+        ->name('register');
 
     Route::post('/logout', [AuthController::class, 'logout'])
         ->name('logout');
+
+    Route::post('/generate-payment-link', [PaymentController::class, 'generatePaymentLink'])
+        ->name('payment.generate');
 
     Route::get('/transactions', [PaymentController::class, 'getAllTransactions'])
         ->name('payment.transactions');
