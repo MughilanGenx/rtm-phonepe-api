@@ -36,6 +36,7 @@ class PaymentController extends Controller
                     new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
                     new OA\Property(property: 'email', type: 'string', format: 'email', example: 'john@example.com'),
                     new OA\Property(property: 'phone', type: 'string', example: '9876543210'),
+                    new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Payment for order #12345'),
                 ]
             )
         ),
@@ -75,6 +76,7 @@ class PaymentController extends Controller
             'name'              => 'required|string|max:255',
             'email'             => 'nullable|email|max:255',
             'phone'             => 'required|string|max:15',
+            'description'       => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -91,6 +93,7 @@ class PaymentController extends Controller
             'name'              => $request->name,
             'email'             => $request->email,
             'phone'             => $request->phone,
+            'description'       => $request->description,
             'status'            => PaymentStatus::INITIATED,
         ]);
 

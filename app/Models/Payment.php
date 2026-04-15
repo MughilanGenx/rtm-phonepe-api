@@ -17,6 +17,7 @@ class Payment extends Model
         'email',
         'phone',
         'amount',
+        'description',
         'status',
         'phonepe_link',       // Fixed: was 'phone_link' (typo)
         'transaction_id',

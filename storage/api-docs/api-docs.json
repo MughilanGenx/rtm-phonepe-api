@@ -343,6 +343,11 @@
                                     "phone": {
                                         "type": "string",
                                         "example": "9876543210"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Payment for order #12345",
+                                        "nullable": true
                                     }
                                 },
                                 "type": "object"
