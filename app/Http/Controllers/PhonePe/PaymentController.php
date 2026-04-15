@@ -11,6 +11,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use App\Services\WhatsAppService;
+
 use OpenApi\Attributes as OA;
 
 #[OA\Tag(name: 'Payment', description: 'PhonePe Payment API Endpoints')]
@@ -18,7 +20,8 @@ class PaymentController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(private PhonepeServices $phonePe) {}
+    public function __construct(private PhonepeServices $phonePe,
+    private WhatsAppService $whatsAppService) {}
 
     #[OA\Post(
         path: '/api/generate-payment-link',
@@ -104,14 +107,30 @@ class PaymentController extends Controller
             'amount'            => $payment->amount,
         ]);
 
+        $data = [
+            'name' => $payment->name,
+            'amount' => $payment->amount,
+            'link' => url('/api/pay/' . $merchantOrderId),
+            'order_id' => $merchantOrderId,
+            'mobile' => $payment->phone,
+        ];
+
+        $response = $this->whatsAppService->sendLinkForPayment($data);
+        if($response == false){
+            Log::error('Error in sending WhatsApp message', [
+                'payment_id'        => $payment->id,
+                'merchant_order_id' => $merchantOrderId,
+                'response'          => $response,
+            ]);
+        }
+
+        if(env('APP_ENV') == 'local'){
+            $paymentLink = url('/api/pay/' . $merchantOrderId);
+        }
+
         return $this->success('Payment link generated successfully', [
-            'payment_id'        => $payment->id,
             'merchant_order_id' => $merchantOrderId,
-            'payment_link'      => url('/api/pay/' . $merchantOrderId),
-            'name'              => $payment->name,
-            'email'             => $payment->email,
-            'phone'             => $payment->phone,
-            'amount'            => $payment->amount,
+            'payment_link'      => $paymentLink ?? null,
             'status'            => $payment->status->value,
         ]);
     }

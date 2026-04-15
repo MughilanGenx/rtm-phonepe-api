@@ -50,4 +50,13 @@ return [
             : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
     ],
 
+    'aisensy'=> [
+        'aisensy_apikey'  => env('AISENSY_API_KEY'),
+        'aisensy_campaign_id'  => env('AISENSY_CAMPAIGN_ID'),
+        'aisensy_skip_ssl_verify'  => env('AISENSY_SKIP_SSL_VERIFY'),
+        'aisensy_login_otp_campaign'  => env('AISENSY_LOGIN_OTP_CAMPAIGN'),
+        'aisensy_login_otp_active'  => env('AISENSY_LOGIN_OTP_ACTIVE'),
+
+    ],
+
 ];
