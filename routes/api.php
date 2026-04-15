@@ -39,6 +39,9 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/transactions', [PaymentController::class, 'getAllTransactions'])
         ->name('payment.transactions');
 
+    Route::post('/reset-user-password', [AuthController::class, 'newUserLogin'])
+        ->name('user.password');
+
     Route::prefix('user')->group(function () {
         Route::get('/roles', [UserManagementController::class, 'index'])
             ->name('user.roles');
