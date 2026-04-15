@@ -62,6 +62,37 @@
                                                     "example": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
                                                 },
                                                 "user": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "name": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "user@example.com"
+                                                        },
+                                                        "phone": {
+                                                            "type": "string",
+                                                            "example": "9876543210",
+                                                            "nullable": true
+                                                        },
+                                                        "role": {
+                                                            "type": "string",
+                                                            "example": "user"
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        },
+                                                        "updated_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        }
+                                                    },
                                                     "type": "object"
                                                 }
                                             },
@@ -78,6 +109,9 @@
                     },
                     "422": {
                         "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 }
             }
@@ -118,6 +152,9 @@
                     },
                     "401": {
                         "description": "Unauthenticated"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -133,7 +170,7 @@
                     "Auth"
                 ],
                 "summary": "Register New User",
-                "description": "Register a new user with a specific role.",
+                "description": "Register a new user with a specific role. This endpoint is restricted to Admin users only.",
                 "operationId": "81424f50e08930bcaa5c4c7710fb7b30",
                 "requestBody": {
                     "required": true,
@@ -163,11 +200,6 @@
                                         "example": "9876543211"
                                     },
                                     "password": {
-                                        "type": "string",
-                                        "format": "password",
-                                        "example": "password123"
-                                    },
-                                    "confirm_password": {
                                         "type": "string",
                                         "format": "password",
                                         "example": "password123"
@@ -202,6 +234,45 @@
                                             "example": "User registered successfully"
                                         },
                                         "data": {
+                                            "properties": {
+                                                "user": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 2
+                                                        },
+                                                        "name": {
+                                                            "type": "string",
+                                                            "example": "Jane Doe"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "jane@example.com"
+                                                        },
+                                                        "phone": {
+                                                            "type": "string",
+                                                            "example": "9876543211"
+                                                        },
+                                                        "role": {
+                                                            "type": "string",
+                                                            "example": "user"
+                                                        },
+                                                        "is_newUser": {
+                                                            "type": "boolean",
+                                                            "example": true
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        },
+                                                        "updated_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
                                             "type": "object"
                                         }
                                     },
@@ -210,13 +281,24 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "403": {
+                        "description": "Unauthorized - Admin role required"
+                    },
                     "422": {
                         "description": "Validation Error"
                     },
-                    "400": {
-                        "description": "Passwords do not match"
+                    "500": {
+                        "description": "Internal Server Error"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/generate-payment-link": {
@@ -269,7 +351,7 @@
                     }
                 },
                 "responses": {
-                    "200": {
+                    "201": {
                         "description": "Payment link generated successfully",
                         "content": {
                             "application/json": {
@@ -326,11 +408,17 @@
                             }
                         }
                     },
-                    "422": {
-                        "description": "Validation Error"
+                    "400": {
+                        "description": "Bad Request"
                     },
                     "401": {
                         "description": "Unauthorized"
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -360,7 +448,7 @@
                 ],
                 "responses": {
                     "302": {
-                        "description": "Redirect to PhonePe checkout"
+                        "description": "Redirect to PhonePe checkout or frontend status page (if already processed or errored). Redirection URL include query params like orderId, status, and error."
                     },
                     "404": {
                         "description": "Payment not found"
@@ -418,7 +506,10 @@
                 },
                 "responses": {
                     "302": {
-                        "description": "Redirect to {FRONTEND_URL}/payment/status?orderId=&status=&amount=&transactionId=&paidAt="
+                        "description": "Redirect to {FRONTEND_URL}/payment/status with query params: orderId, status (COMPLETED|PENDING|DECLINED|CANCELLED|ERROR), amount, transactionId, paidAt."
+                    },
+                    "500": {
+                        "description": "Verification logic error"
                     }
                 }
             }
@@ -438,7 +529,7 @@
                             "schema": {
                                 "properties": {
                                     "response": {
-                                        "description": "Base64 encoded payload",
+                                        "description": "Base64 encoded payload containing transaction details like merchantOrderId, amount, and state.",
                                         "type": "string"
                                     }
                                 },
@@ -483,7 +574,71 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Payment status returned successfully"
+                        "description": "Payment status returned successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Payment verified successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "transaction_id": {
+                                                    "type": "string",
+                                                    "example": "T2604091523459403481676"
+                                                },
+                                                "amount": {
+                                                    "type": "number",
+                                                    "example": 11
+                                                },
+                                                "payment_status": {
+                                                    "type": "string",
+                                                    "example": "COMPLETED"
+                                                },
+                                                "payment_id": {
+                                                    "type": "integer",
+                                                    "example": 17
+                                                },
+                                                "merchant_order_id": {
+                                                    "type": "string",
+                                                    "example": "ORDER_69D7771BBF"
+                                                },
+                                                "paid_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "transaction": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "status": {
+                                                            "type": "string"
+                                                        },
+                                                        "amount": {
+                                                            "type": "string"
+                                                        },
+                                                        "payment_response": {
+                                                            "type": "object",
+                                                            "nullable": true
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "202": {
                         "description": "Payment is being processed"
@@ -582,8 +737,56 @@
                                                 "data": {
                                                     "type": "array",
                                                     "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "merchant_order_id": {
+                                                                "type": "string"
+                                                            },
+                                                            "amount": {
+                                                                "type": "string"
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "user": {
+                                                                "properties": {
+                                                                    "name": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "email": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
                                                         "type": "object"
                                                     }
+                                                },
+                                                "first_page_url": {
+                                                    "type": "string"
+                                                },
+                                                "last_page": {
+                                                    "type": "integer"
+                                                },
+                                                "last_page_url": {
+                                                    "type": "string"
+                                                },
+                                                "next_page_url": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "path": {
+                                                    "type": "string"
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "prev_page_url": {
+                                                    "type": "string",
+                                                    "nullable": true
                                                 },
                                                 "total": {
                                                     "type": "integer",
@@ -597,6 +800,12 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -769,6 +978,9 @@
                                 }
                             }
                         }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -802,6 +1014,42 @@
                                             "example": "User management"
                                         },
                                         "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "john@example.com"
+                                                },
+                                                "phone": {
+                                                    "type": "string",
+                                                    "example": "9876543210",
+                                                    "nullable": true
+                                                },
+                                                "role": {
+                                                    "type": "string",
+                                                    "example": "user"
+                                                },
+                                                "profile_image": {
+                                                    "type": "string",
+                                                    "example": "123456789.webp",
+                                                    "nullable": true
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
                                             "type": "object"
                                         }
                                     },
@@ -815,6 +1063,9 @@
                     },
                     "404": {
                         "description": "User not found"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -867,6 +1118,12 @@
                     },
                     "401": {
                         "description": "Unauthenticated"
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -925,6 +1182,12 @@
                     },
                     "401": {
                         "description": "Unauthenticated"
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -970,7 +1233,10 @@
                         "description": "Unauthenticated"
                     },
                     "422": {
-                        "description": "Validation error"
+                        "description": "Validation error - Image must be jpeg, png, jpg, or webp and <= 2MB"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [

@@ -41,7 +41,7 @@ class PaymentController extends Controller
         ),
         responses: [
             new OA\Response(
-                response: 200,
+                response: 201,
                 description: 'Payment link generated successfully',
                 content: new OA\JsonContent(
                     properties: [
@@ -60,8 +60,10 @@ class PaymentController extends Controller
                     ]
                 )
             ),
+            new OA\Response(response: 400, description: 'Bad Request'),
+            new OA\Response(response: 401, description: 'Unauthorized'),
             new OA\Response(response: 422, description: 'Validation Error'),
-            new OA\Response(response: 401, description: 'Unauthorized')
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function generatePaymentLink(Request $request): JsonResponse
@@ -121,7 +123,10 @@ class PaymentController extends Controller
             new OA\Parameter(name: 'merchantOrderId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
         ],
         responses: [
-            new OA\Response(response: 302, description: 'Redirect to PhonePe checkout'),
+            new OA\Response(
+                response: 302, 
+                description: 'Redirect to PhonePe checkout or frontend status page (if already processed or errored). Redirection URL include query params like orderId, status, and error.'
+            ),
             new OA\Response(response: 404, description: 'Payment not found'),
             new OA\Response(response: 400, description: 'Payment link already used'),
             new OA\Response(response: 502, description: 'Payment initiation failed')
@@ -241,8 +246,9 @@ class PaymentController extends Controller
         responses: [
             new OA\Response(
                 response: 302,
-                description: 'Redirect to {FRONTEND_URL}/payment/status?orderId=&status=&amount=&transactionId=&paidAt='
-            )
+                description: 'Redirect to {FRONTEND_URL}/payment/status with query params: orderId, status (COMPLETED|PENDING|DECLINED|CANCELLED|ERROR), amount, transactionId, paidAt.'
+            ),
+            new OA\Response(response: 500, description: 'Verification logic error')
         ]
     )]
     public function callback(string $merchantOrderId)
@@ -300,7 +306,7 @@ class PaymentController extends Controller
             required: true,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'response', type: 'string', description: 'Base64 encoded payload')
+                    new OA\Property(property: 'response', type: 'string', description: 'Base64 encoded payload containing transaction details like merchantOrderId, amount, and state.')
                 ]
             )
         ),
@@ -361,7 +367,30 @@ class PaymentController extends Controller
             new OA\Parameter(name: 'merchantOrderId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Payment status returned successfully'),
+            new OA\Response(
+                response: 200, 
+                description: 'Payment status returned successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'message', type: 'string', example: 'Payment verified successfully'),
+                        new OA\Property(property: 'data', type: 'object', properties: [
+                            new OA\Property(property: 'transaction_id', type: 'string', example: 'T2604091523459403481676'),
+                            new OA\Property(property: 'amount', type: 'number', example: 11.00),
+                            new OA\Property(property: 'payment_status', type: 'string', example: 'COMPLETED'),
+                            new OA\Property(property: 'payment_id', type: 'integer', example: 17),
+                            new OA\Property(property: 'merchant_order_id', type: 'string', example: 'ORDER_69D7771BBF'),
+                            new OA\Property(property: 'paid_at', type: 'string', format: 'date-time'),
+                            new OA\Property(property: 'transaction', type: 'object', properties: [
+                                new OA\Property(property: 'id', type: 'integer'),
+                                new OA\Property(property: 'status', type: 'string'),
+                                new OA\Property(property: 'amount', type: 'string'),
+                                new OA\Property(property: 'payment_response', type: 'object', nullable: true),
+                            ])
+                        ])
+                    ]
+                )
+            ),
             new OA\Response(response: 202, description: 'Payment is being processed'),
             new OA\Response(response: 400, description: 'Payment declined or errored'),
             new OA\Response(response: 404, description: 'Payment not found'),
@@ -429,17 +458,38 @@ class PaymentController extends Controller
                         new OA\Property(property: 'message', type: 'string', example: 'Transactions fetched successfully'),
                         new OA\Property(property: 'data', type: 'object', properties: [
                             new OA\Property(property: 'current_page', type: 'integer', example: 1),
-                            new OA\Property(property: 'data', type: 'array', items: new OA\Items(type: 'object')),
+                            new OA\Property(property: 'data', type: 'array', items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer'),
+                                    new OA\Property(property: 'merchant_order_id', type: 'string'),
+                                    new OA\Property(property: 'amount', type: 'string'),
+                                    new OA\Property(property: 'status', type: 'string'),
+                                    new OA\Property(property: 'user', type: 'object', properties: [
+                                        new OA\Property(property: 'name', type: 'string'),
+                                        new OA\Property(property: 'email', type: 'string'),
+                                    ])
+                                ]
+                            )),
+                            new OA\Property(property: 'first_page_url', type: 'string'),
+                            new OA\Property(property: 'last_page', type: 'integer'),
+                            new OA\Property(property: 'last_page_url', type: 'string'),
+                            new OA\Property(property: 'next_page_url', type: 'string', nullable: true),
+                            new OA\Property(property: 'path', type: 'string'),
+                            new OA\Property(property: 'per_page', type: 'integer'),
+                            new OA\Property(property: 'prev_page_url', type: 'string', nullable: true),
                             new OA\Property(property: 'total', type: 'integer', example: 50)
                         ])
                     ]
                 )
-            )
+            ),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function getAllTransactions(Request $request): JsonResponse
     {
-        $query = Payment::query();
+        $query = Payment::query()->with('user:name,email');
 
         // 1. Search by generic terms (name, email, phone, order ID, or transaction ID)
         if ($request->filled('search')) {
@@ -533,14 +583,13 @@ class PaymentController extends Controller
     )]
     public function getTransactionById(string $orderId): JsonResponse
     {
-        $payment = Payment::where('merchant_order_id', $orderId)->first();
+        $payment = Payment::where('merchant_order_id', $orderId)->with('user:name')->first();
 
         if (! $payment) {
             return $this->error('Transaction not found', 404, 'TRANSACTION_NOT_FOUND');
         }
 
         $responseData = $payment->only([
-            'id',
             'merchant_order_id',
             'name',
             'email',
@@ -553,6 +602,9 @@ class PaymentController extends Controller
             'created_at',
             'updated_at',
         ]);
+
+        // Add user name to response
+        $responseData['user_name'] = $payment->user?->name;
 
         if (isset($responseData['payment_response']['paymentDetails'])) {
             unset($responseData['payment_response']['paymentDetails']);

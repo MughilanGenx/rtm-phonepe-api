@@ -47,6 +47,7 @@ class UserManagementController extends Controller
                     ]
                 )
             ),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function index()
@@ -83,12 +84,22 @@ class UserManagementController extends Controller
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'message', type: 'string', example: 'User management'),
-                        new OA\Property(property: 'data', type: 'object'),
+                        new OA\Property(property: 'data', type: 'object', properties: [
+                            new OA\Property(property: 'id', type: 'integer', example: 1),
+                            new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
+                            new OA\Property(property: 'email', type: 'string', example: 'john@example.com'),
+                            new OA\Property(property: 'phone', type: 'string', example: '9876543210', nullable: true),
+                            new OA\Property(property: 'role', type: 'string', example: 'user'),
+                            new OA\Property(property: 'profile_image', type: 'string', example: '123456789.webp', nullable: true),
+                            new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+                            new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
+                        ]),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Unauthenticated'),
             new OA\Response(response: 404, description: 'User not found'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function profileManagement(Request $request)
@@ -132,6 +143,8 @@ class UserManagementController extends Controller
             new OA\Response(response: 200, description: 'Profile updated successfully'),
             new OA\Response(response: 400, description: 'Email or Phone already exists'),
             new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 422, description: 'Validation Error'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function updateProfileManagement(Request $request)
@@ -189,6 +202,8 @@ class UserManagementController extends Controller
             new OA\Response(response: 200, description: 'Password changed successfully'),
             new OA\Response(response: 400, description: 'Validation error or incorrect old password'),
             new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 422, description: 'Validation Error'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function changePasswordManagement(Request $request)
@@ -256,7 +271,8 @@ class UserManagementController extends Controller
         responses: [
             new OA\Response(response: 200, description: 'Profile image uploaded successfully'),
             new OA\Response(response: 401, description: 'Unauthenticated'),
-            new OA\Response(response: 422, description: 'Validation error'),
+            new OA\Response(response: 422, description: 'Validation error - Image must be jpeg, png, jpg, or webp and <= 2MB'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function uploadUserProfile(Request $request)

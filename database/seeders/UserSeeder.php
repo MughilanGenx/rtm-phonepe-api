@@ -17,7 +17,10 @@ class UserSeeder extends Seeder
         User::create([
             'name' => 'Admin',
             'email' => 'admin@rtm.com',
+            'role' => 'admin',
             'password' => Hash::make('password'),
+            'profile_image' => 'https://ui-avatars.com/api/?name=Admin',
+            'is_new_user' => false
         ]);
     }
 }

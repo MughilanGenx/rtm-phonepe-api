@@ -44,13 +44,22 @@ class AuthController extends Controller
                         new OA\Property(property: 'message', type: 'string', example: 'Login successful'),
                         new OA\Property(property: 'data', type: 'object', properties: [
                             new OA\Property(property: 'token', type: 'string', example: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'),
-                            new OA\Property(property: 'user', type: 'object'),
+                            new OA\Property(property: 'user', type: 'object', properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 1),
+                                new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
+                                new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
+                                new OA\Property(property: 'phone', type: 'string', example: '9876543210', nullable: true),
+                                new OA\Property(property: 'role', type: 'string', example: 'user'),
+                                new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
+                            ]),
                         ]),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Invalid credentials'),
             new OA\Response(response: 422, description: 'Validation Error'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function login(Request $request)
@@ -109,6 +118,7 @@ class AuthController extends Controller
                 )
             ),
             new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function logout()
@@ -125,7 +135,8 @@ class AuthController extends Controller
     #[OA\Post(
         path: '/api/register',
         summary: 'Register New User',
-        description: 'Register a new user with a specific role.',
+        description: 'Register a new user with a specific role. This endpoint is restricted to Admin users only.',
+        security: [['bearerAuth' => []]],
         tags: ['Auth'],
         requestBody: new OA\RequestBody(
             required: true,
@@ -136,7 +147,6 @@ class AuthController extends Controller
                     new OA\Property(property: 'email', type: 'string', format: 'email', example: 'jane@example.com'),
                     new OA\Property(property: 'phone', type: 'string', example: '9876543211'),
                     new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password123'),
-                    new OA\Property(property: 'confirm_password', type: 'string', format: 'password', example: 'password123'),
                     new OA\Property(property: 'role', type: 'string', enum: ['admin', 'user'], example: 'user'),
                 ]
             )
@@ -149,16 +159,35 @@ class AuthController extends Controller
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'message', type: 'string', example: 'User registered successfully'),
-                        new OA\Property(property: 'data', type: 'object'),
+                        new OA\Property(property: 'data', type: 'object', properties: [
+                            new OA\Property(property: 'user', type: 'object', properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 2),
+                                new OA\Property(property: 'name', type: 'string', example: 'Jane Doe'),
+                                new OA\Property(property: 'email', type: 'string', example: 'jane@example.com'),
+                                new OA\Property(property: 'phone', type: 'string', example: '9876543211'),
+                                new OA\Property(property: 'role', type: 'string', example: 'user'),
+                                new OA\Property(property: 'is_newUser', type: 'boolean', example: true),
+                                new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
+                            ]),
+                        ]),
                     ]
                 )
             ),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 403, description: 'Unauthorized - Admin role required'),
             new OA\Response(response: 422, description: 'Validation Error'),
-            new OA\Response(response: 400, description: 'Passwords do not match'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function registerNewUser(Request $request)
     {
+        $userRole = auth('api')->user()->role;
+
+        if($userRole != Role::ADMIN) {
+            return $this->error('You are not authorized to perform this action', 403, 'UNAUTHORIZED');
+        }
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:50',
             'email' => 'required|email|max:125|unique:users,email',
