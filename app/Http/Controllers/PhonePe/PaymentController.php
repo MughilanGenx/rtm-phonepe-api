@@ -598,6 +598,7 @@ class PaymentController extends Controller
             'email',
             'phone',
             'amount',
+            'description',
             'status',
             'payment_response',
             'last_synced_at',
