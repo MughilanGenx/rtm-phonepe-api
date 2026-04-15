@@ -232,7 +232,7 @@ class AuthController extends Controller
     }
 
     #[OA\Post(
-        path: '/api/new-user-login',
+        path: '/api/reset-user-password',
         summary: 'New User Password Setup',
         description: 'Set a new password for a newly created user account.',
         security: [['bearerAuth' => []]],

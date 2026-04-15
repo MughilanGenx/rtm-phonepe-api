@@ -301,14 +301,14 @@
                 ]
             }
         },
-        "/api/new-user-login": {
+        "/api/reset-user-password": {
             "post": {
                 "tags": [
                     "Auth"
                 ],
                 "summary": "New User Password Setup",
                 "description": "Set a new password for a newly created user account.",
-                "operationId": "dc181517be634761a1537d370d5650c2",
+                "operationId": "e31d294061e88ef1fcf9b3c3f5036651",
                 "requestBody": {
                     "required": true,
                     "content": {
