@@ -466,6 +466,7 @@ class PaymentController extends Controller
         parameters: [
             new OA\Parameter(name: 'search', in: 'query', required: false, description: 'Search by order ID, name, email, phone, or transaction ID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'status', in: 'query', required: false, description: 'Filter by payment status (e.g., INIT, COMPLETED, PENDING, DECLINED, CANCELLED)', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'date_filter', in: 'query', required: false, description: 'Quick date filter (today, yesterday, this_week, this_month, past_6_months, custom)', schema: new OA\Schema(type: 'string', enum: ['today', 'yesterday', 'this_week', 'this_month', 'past_6_months', 'custom'])),
             new OA\Parameter(name: 'from_date', in: 'query', required: false, description: 'Start date (YYYY-MM-DD)', schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'to_date', in: 'query', required: false, description: 'End date (YYYY-MM-DD)', schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'per_page', in: 'query', required: false, description: 'Items per page (default: 10)', schema: new OA\Schema(type: 'integer', default: 10))
@@ -500,7 +501,9 @@ class PaymentController extends Controller
                             new OA\Property(property: 'path', type: 'string'),
                             new OA\Property(property: 'per_page', type: 'integer'),
                             new OA\Property(property: 'prev_page_url', type: 'string', nullable: true),
-                            new OA\Property(property: 'total', type: 'integer', example: 50)
+                            new OA\Property(property: 'total', type: 'integer', example: 50),
+                            new OA\Property(property: 'total_amount', type: 'number', example: 12500.50),
+                            new OA\Property(property: 'transaction_count', type: 'integer', example: 50)
                         ])
                     ]
                 )
@@ -531,20 +534,82 @@ class PaymentController extends Controller
         }
 
         // 3. Filter by Date Range
-        if ($request->filled('from_date')) {
-            $query->whereDate('created_at', '>=', $request->from_date);
-        }
-        
-        if ($request->filled('to_date')) {
-            $query->whereDate('created_at', '<=', $request->to_date);
+        if ($request->filled('date_filter')) {
+            $dateFilter = $request->input('date_filter');
+
+            switch ($dateFilter) {
+                case 'today':
+                    $query->whereDate('created_at', now()->toDateString());
+                    break;
+                case 'yesterday':
+                    $query->whereDate('created_at', now()->subDay()->toDateString());
+                    break;
+                case 'this_week':
+                    $query->whereBetween('created_at', [
+                        now()->startOfWeek(),
+                        now()->endOfWeek()
+                    ]);
+                    break;
+                case 'this_month':
+                    $query->whereBetween('created_at', [
+                        now()->startOfMonth(),
+                        now()->endOfMonth()
+                    ]);
+                    break;
+                case 'past_6_months':
+                    $query->where('created_at', '>=', now()->subMonths(6)->startOfDay());
+                    break;
+                case 'custom':
+                default:
+                    if ($request->filled('from_date')) {
+                        $fromDate = trim($request->from_date);
+                        if (strlen($fromDate) <= 10) {
+                            $query->whereDate('created_at', '>=', $fromDate);
+                        } else {
+                            $query->where('created_at', '>=', \Carbon\Carbon::parse($fromDate)->toDateTimeString());
+                        }
+                    }
+                    if ($request->filled('to_date')) {
+                        $toDate = trim($request->to_date);
+                        if (strlen($toDate) <= 10) {
+                            $query->whereDate('created_at', '<=', $toDate);
+                        } else {
+                            $query->where('created_at', '<=', \Carbon\Carbon::parse($toDate)->toDateTimeString());
+                        }
+                    }
+                    break;
+            }
+        } else {
+            if ($request->filled('from_date')) {
+                $fromDate = trim($request->from_date);
+                if (strlen($fromDate) <= 10) {
+                    $query->whereDate('created_at', '>=', $fromDate);
+                } else {
+                    $query->where('created_at', '>=', \Carbon\Carbon::parse($fromDate)->toDateTimeString());
+                }
+            }
+            if ($request->filled('to_date')) {
+                $toDate = trim($request->to_date);
+                if (strlen($toDate) <= 10) {
+                    $query->whereDate('created_at', '<=', $toDate);
+                } else {
+                    $query->where('created_at', '<=', \Carbon\Carbon::parse($toDate)->toDateTimeString());
+                }
+            }
         }
 
         // Configure pagination (default to 10 if not provided)
         $perPage = $request->input('per_page', 10);
         
+        $totalAmount = (clone $query)->sum('amount');
+
         $payments = $query->latest()->paginate($perPage);
 
-        return $this->success('Transactions fetched successfully', $payments);
+        $responseData = $payments->toArray();
+        $responseData['total_amount'] = $totalAmount;
+        $responseData['transaction_count'] = $payments->total();
+
+        return $this->success('Transactions fetched successfully', $responseData);
     }
 
 

@@ -232,11 +232,19 @@ class PhonepeServices
             'app_status'     => $appStatus,
         ]);
 
+        // Extract paymentMode from first paymentDetails entry
+        $paymentMode = null;
+        $paymentDetails = $data['paymentDetails'] ?? [];
+        if (! empty($paymentDetails) && is_array($paymentDetails)) {
+            $paymentMode = $paymentDetails[0]['paymentMode'] ?? null;
+        }
+
         $attrs = [
             'status'           => $appStatus,
             'transaction_id'   => $data['transactionId'] ?? $data['transactionID'] ?? null,
             'phonepe_order_id' => $data['orderId'] ?? $data['orderID'] ?? null,
             'payment_response' => $statusResponse,
+            'payment_mode'     => $paymentMode,
             'last_synced_at'   => now(),
         ];
 

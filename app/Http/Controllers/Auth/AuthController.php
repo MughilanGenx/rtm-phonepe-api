@@ -27,9 +27,9 @@ class AuthController extends Controller
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['email', 'password'],
+                required: ['phone', 'password'],
                 properties: [
-                    new OA\Property(property: 'email', type: 'string', format: 'email', example: 'user@example.com'),
+                    new OA\Property(property: 'phone', type: 'string', example: '9876543210'),
                     new OA\Property(property: 'password', type: 'string', format: 'password', example: 'secret'),
                 ]
             )
@@ -65,7 +65,8 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
+            'phone' => 'required|string|max:15',
+            'email' => 'nullable|email',
             'password' => 'required',
         ]);
 
@@ -74,7 +75,7 @@ class AuthController extends Controller
         }
 
         try {
-            $user = User::where('email', $request->email)->first();
+            $user = User::where('phone', $request->phone)->first();
 
             if (! $user || ! Hash::check($request->password, $user->password)) {
                 return $this->error('Invalid credentials', 401, 'AUTH_ERROR');
@@ -190,8 +191,8 @@ class AuthController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:50',
-            'email' => 'required|email|max:125|unique:users,email',
-            'phone' => 'nullable|string|max:15|unique:users,phone',
+            'email' => 'nullable|email|max:125|unique:users,email',
+            'phone' => 'required|string|max:15|unique:users,phone',
             'password' => 'required|string|min:6|max:255',
             'role' => ['required', new Enum(Role::class)],
         ]);
@@ -209,7 +210,7 @@ class AuthController extends Controller
 
             $user = User::create([
                 'name' => $data['name'],
-                'email' => $data['email'],
+                'email' => $data['email'] ?? null,
                 'phone' => $data['phone'] ?? null,
                 'role' => $data['role'],
                 'password' => Hash::make($data['password']),
