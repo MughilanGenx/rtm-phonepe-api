@@ -834,6 +834,15 @@
                         }
                     },
                     {
+                        "name": "transaction_id",
+                        "in": "query",
+                        "description": "Filter explicitly by provider transaction ID",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "description": "Items per page (default: 10)",
