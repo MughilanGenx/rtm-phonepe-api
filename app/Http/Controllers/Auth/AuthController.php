@@ -49,7 +49,7 @@ class AuthController extends Controller
                                 new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
                                 new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
                                 new OA\Property(property: 'phone', type: 'string', example: '9876543210', nullable: true),
-                                new OA\Property(property: 'role', type: 'string', example: 'user'),
+                                new OA\Property(property: 'role', type: 'string', example: 'staff'),
                                 new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
                             ]),
@@ -148,7 +148,7 @@ class AuthController extends Controller
                     new OA\Property(property: 'email', type: 'string', format: 'email', example: 'jane@example.com'),
                     new OA\Property(property: 'phone', type: 'string', example: '9876543211'),
                     new OA\Property(property: 'password', type: 'string', format: 'password', example: 'password123'),
-                    new OA\Property(property: 'role', type: 'string', enum: ['admin', 'user'], example: 'user'),
+                    new OA\Property(property: 'role', type: 'string', enum: ['admin', 'staff'], example: 'staff'),
                 ]
             )
         ),
@@ -166,7 +166,7 @@ class AuthController extends Controller
                                 new OA\Property(property: 'name', type: 'string', example: 'Jane Doe'),
                                 new OA\Property(property: 'email', type: 'string', example: 'jane@example.com'),
                                 new OA\Property(property: 'phone', type: 'string', example: '9876543211'),
-                                new OA\Property(property: 'role', type: 'string', example: 'user'),
+                                new OA\Property(property: 'role', type: 'string', example: 'staff'),
                                 new OA\Property(property: 'is_newUser', type: 'boolean', example: true),
                                 new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),

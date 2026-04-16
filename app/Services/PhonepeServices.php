@@ -232,16 +232,18 @@ class PhonepeServices
             'app_status'     => $appStatus,
         ]);
 
-        // Extract paymentMode from first paymentDetails entry
+        // Extract paymentMode and transactionId from first paymentDetails entry
         $paymentMode = null;
+        $nestedTransactionId = null;
         $paymentDetails = $data['paymentDetails'] ?? [];
         if (! empty($paymentDetails) && is_array($paymentDetails)) {
             $paymentMode = $paymentDetails[0]['paymentMode'] ?? null;
+            $nestedTransactionId = $paymentDetails[0]['transactionId'] ?? null;
         }
 
         $attrs = [
             'status'           => $appStatus,
-            'transaction_id'   => $data['transactionId'] ?? $data['transactionID'] ?? null,
+            'transaction_id'   => $nestedTransactionId ?? $data['transactionId'] ?? $data['transactionID'] ?? null,
             'phonepe_order_id' => $data['orderId'] ?? $data['orderID'] ?? null,
             'payment_response' => $statusResponse,
             'payment_mode'     => $paymentMode,

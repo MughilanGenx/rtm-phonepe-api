@@ -472,6 +472,7 @@ class PaymentController extends Controller
             new OA\Parameter(name: 'min_amount', in: 'query', required: false, description: 'Minimum amount', schema: new OA\Schema(type: 'number')),
             new OA\Parameter(name: 'max_amount', in: 'query', required: false, description: 'Maximum amount', schema: new OA\Schema(type: 'number')),
             new OA\Parameter(name: 'payment_mode', in: 'query', required: false, description: 'Filter by Payment Mode (e.g. UPI, CARD, NET_BANKING)', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'transaction_id', in: 'query', required: false, description: 'Filter explicitly by provider transaction ID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'per_page', in: 'query', required: false, description: 'Items per page (default: 10)', schema: new OA\Schema(type: 'integer', default: 10))
         ],
         responses: [
@@ -535,6 +536,11 @@ class PaymentController extends Controller
         if ($request->filled('status')) {
             $statuses = is_array($request->status) ? $request->status : explode(',', $request->status);
             $query->whereIn('status', array_map('trim', $statuses));
+        }
+
+        // Filter explicitly by Transaction ID
+        if ($request->filled('transaction_id')) {
+            $query->where('transaction_id', $request->transaction_id);
         }
 
         // Filter by Amount Range

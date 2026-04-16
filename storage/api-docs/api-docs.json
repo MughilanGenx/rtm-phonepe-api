@@ -81,7 +81,7 @@
                                                         },
                                                         "role": {
                                                             "type": "string",
-                                                            "example": "user"
+                                                            "example": "staff"
                                                         },
                                                         "created_at": {
                                                             "type": "string",
@@ -205,10 +205,10 @@
                                     },
                                     "role": {
                                         "type": "string",
-                                        "example": "user",
+                                        "example": "staff",
                                         "enum": [
                                             "admin",
-                                            "user"
+                                            "staff"
                                         ]
                                     }
                                 },
@@ -254,7 +254,7 @@
                                                         },
                                                         "role": {
                                                             "type": "string",
-                                                            "example": "user"
+                                                            "example": "staff"
                                                         },
                                                         "is_newUser": {
                                                             "type": "boolean",
@@ -1102,11 +1102,11 @@
                                                 "properties": {
                                                     "value": {
                                                         "type": "string",
-                                                        "example": "user"
+                                                        "example": "staff"
                                                     },
                                                     "label": {
                                                         "type": "string",
-                                                        "example": "User"
+                                                        "example": "Staff"
                                                     }
                                                 },
                                                 "type": "object"
@@ -1173,7 +1173,7 @@
                                                 },
                                                 "role": {
                                                     "type": "string",
-                                                    "example": "user"
+                                                    "example": "staff"
                                                 },
                                                 "profile_image": {
                                                     "type": "string",

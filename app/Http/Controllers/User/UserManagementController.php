@@ -39,8 +39,8 @@ class UserManagementController extends Controller
                             items: new OA\Items(
                                 type: 'object',
                                 properties: [
-                                    new OA\Property(property: 'value', type: 'string', example: 'user'),
-                                    new OA\Property(property: 'label', type: 'string', example: 'User'),
+                                    new OA\Property(property: 'value', type: 'string', example: 'staff'),
+                                    new OA\Property(property: 'label', type: 'string', example: 'Staff'),
                                 ]
                             )
                         ),
@@ -89,7 +89,7 @@ class UserManagementController extends Controller
                             new OA\Property(property: 'name', type: 'string', example: 'John Doe'),
                             new OA\Property(property: 'email', type: 'string', example: 'john@example.com'),
                             new OA\Property(property: 'phone', type: 'string', example: '9876543210', nullable: true),
-                            new OA\Property(property: 'role', type: 'string', example: 'user'),
+                            new OA\Property(property: 'role', type: 'string', example: 'staff'),
                             new OA\Property(property: 'profile_image', type: 'string', example: '123456789.webp', nullable: true),
                             new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
                             new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
