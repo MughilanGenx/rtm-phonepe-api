@@ -469,6 +469,9 @@ class PaymentController extends Controller
             new OA\Parameter(name: 'date_filter', in: 'query', required: false, description: 'Quick date filter (today, yesterday, this_week, this_month, past_6_months, custom)', schema: new OA\Schema(type: 'string', enum: ['today', 'yesterday', 'this_week', 'this_month', 'past_6_months', 'custom'])),
             new OA\Parameter(name: 'from_date', in: 'query', required: false, description: 'Start date (YYYY-MM-DD)', schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'to_date', in: 'query', required: false, description: 'End date (YYYY-MM-DD)', schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'min_amount', in: 'query', required: false, description: 'Minimum amount', schema: new OA\Schema(type: 'number')),
+            new OA\Parameter(name: 'max_amount', in: 'query', required: false, description: 'Maximum amount', schema: new OA\Schema(type: 'number')),
+            new OA\Parameter(name: 'payment_mode', in: 'query', required: false, description: 'Filter by Payment Mode (e.g. UPI, CARD, NET_BANKING)', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'per_page', in: 'query', required: false, description: 'Items per page (default: 10)', schema: new OA\Schema(type: 'integer', default: 10))
         ],
         responses: [
@@ -528,9 +531,24 @@ class PaymentController extends Controller
             });
         }
 
-        // 2. Filter by status
+        // 2. Filter by status (Supports single value, comma-separated string, or array)
         if ($request->filled('status')) {
-            $query->where('status', $request->status);
+            $statuses = is_array($request->status) ? $request->status : explode(',', $request->status);
+            $query->whereIn('status', array_map('trim', $statuses));
+        }
+
+        // Filter by Amount Range
+        if ($request->filled('min_amount')) {
+            $query->where('amount', '>=', $request->min_amount);
+        }
+        if ($request->filled('max_amount')) {
+            $query->where('amount', '<=', $request->max_amount);
+        }
+
+        // Filter by Payment Mode (Supports single value, comma-separated string, or array)
+        if ($request->filled('payment_mode')) {
+            $modes = is_array($request->payment_mode) ? $request->payment_mode : explode(',', $request->payment_mode);
+            $query->whereIn('payment_mode', array_map('trim', $modes));
         }
 
         // 3. Filter by Date Range
