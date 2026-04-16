@@ -629,12 +629,12 @@ class PaymentController extends Controller
         // Add user name to response
         $responseData['user_name'] = $payment->user?->name;
 
-        if (isset($responseData['payment_response']['paymentDetails'])) {
-            unset($responseData['payment_response']['paymentDetails']);
-        }
-        if (isset($responseData['payment_response']['phonepeTPAPTxnDetailsLink'])) {
-            unset($responseData['payment_response']['phonepeTPAPTxnDetailsLink']);
-        }
+        // if (isset($responseData['payment_response']['paymentDetails'])) {
+        //     unset($responseData['payment_response']['paymentDetails']);
+        // }
+        // if (isset($responseData['payment_response']['phonepeTPAPTxnDetailsLink'])) {
+        //     unset($responseData['payment_response']['phonepeTPAPTxnDetailsLink']);
+        // }
 
         return $this->success('Transaction fetched successfully', [$responseData]);
     }
@@ -697,12 +697,12 @@ class PaymentController extends Controller
             'updated_at',
         ]);
 
-        if (isset($responseData['payment_response']['paymentDetails'])) {
-            unset($responseData['payment_response']['paymentDetails']);
-        }
-        if (isset($responseData['payment_response']['phonepeTPAPTxnDetailsLink'])) {
-            unset($responseData['payment_response']['phonepeTPAPTxnDetailsLink']);
-        }
+        // if (isset($responseData['payment_response']['paymentDetails'])) {
+        //     unset($responseData['payment_response']['paymentDetails']);
+        // }
+        // if (isset($responseData['payment_response']['phonepeTPAPTxnDetailsLink'])) {
+        //     unset($responseData['payment_response']['phonepeTPAPTxnDetailsLink']);
+        // }
 
         $data = [
             'transaction_id'    => $payment->transaction_id,
