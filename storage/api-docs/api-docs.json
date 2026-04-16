@@ -20,14 +20,13 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "email",
+                                    "phone",
                                     "password"
                                 ],
                                 "properties": {
-                                    "email": {
+                                    "phone": {
                                         "type": "string",
-                                        "format": "email",
-                                        "example": "user@example.com"
+                                        "example": "9876543210"
                                     },
                                     "password": {
                                         "type": "string",
@@ -771,6 +770,23 @@
                         }
                     },
                     {
+                        "name": "date_filter",
+                        "in": "query",
+                        "description": "Quick date filter (today, yesterday, this_week, this_month, past_6_months, custom)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "today",
+                                "yesterday",
+                                "this_week",
+                                "this_month",
+                                "past_6_months",
+                                "custom"
+                            ]
+                        }
+                    },
+                    {
                         "name": "from_date",
                         "in": "query",
                         "description": "Start date (YYYY-MM-DD)",
@@ -788,6 +804,33 @@
                         "schema": {
                             "type": "string",
                             "format": "date"
+                        }
+                    },
+                    {
+                        "name": "min_amount",
+                        "in": "query",
+                        "description": "Minimum amount",
+                        "required": false,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "max_amount",
+                        "in": "query",
+                        "description": "Maximum amount",
+                        "required": false,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "payment_mode",
+                        "in": "query",
+                        "description": "Filter by Payment Mode (e.g. UPI, CARD, NET_BANKING)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     {
@@ -877,6 +920,14 @@
                                                     "nullable": true
                                                 },
                                                 "total": {
+                                                    "type": "integer",
+                                                    "example": 50
+                                                },
+                                                "total_amount": {
+                                                    "type": "number",
+                                                    "example": 12500.5
+                                                },
+                                                "transaction_count": {
                                                     "type": "integer",
                                                     "example": 50
                                                 }
