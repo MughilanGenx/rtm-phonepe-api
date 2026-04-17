@@ -1082,6 +1082,50 @@
                 ]
             }
         },
+        "/api/payment-modes": {
+            "get": {
+                "tags": [
+                    "Payment"
+                ],
+                "summary": "Get Payment Mode Options",
+                "description": "Returns all valid payment mode values from the PaymentMode enum for use in frontend filter dropdowns.",
+                "operationId": "b67c560c486cb2e901a9f208f00a5205",
+                "responses": {
+                    "200": {
+                        "description": "Payment modes returned successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string",
+                                                        "example": "UPI"
+                                                    },
+                                                    "label": {
+                                                        "type": "string",
+                                                        "example": "UPI"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/user/roles": {
             "get": {
                 "tags": [
