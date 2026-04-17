@@ -305,13 +305,11 @@ class PhonepeServices
         Log::error($phonepeStatus);
 
         return match (strtoupper($phonepeStatus)) {
-            'SUCCESS', 'COMPLETED', 'PAYMENT_SUCCESS' => PaymentStatus::COMPLETED->value,
-            'PENDING', 'PAYMENT_PENDING'               => PaymentStatus::PENDING->value,
-            'FAILED', 'PAYMENT_FAILED'                 => PaymentStatus::ERROR->value,
-            'DECLINED', 'PAYMENT_DECLINED'             => PaymentStatus::DECLINED->value,
-            'CANCELLED', 'PAYMENT_CANCELLED'           => PaymentStatus::CANCELLED->value,
-            'INITIATED'                                 => PaymentStatus::INITIATED->value,
-            default                                     => PaymentStatus::ERROR->value,
+            'COMPLETED' => PaymentStatus::COMPLETED->value,
+            'PENDING'   => PaymentStatus::PENDING->value,
+            'FAILED'    => PaymentStatus::FAILED->value,
+            'INITIATED' => PaymentStatus::INITIATED->value,
+            default     => PaymentStatus::FAILED->value,
         };
     }
 }

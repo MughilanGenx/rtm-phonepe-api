@@ -807,9 +807,7 @@ class PaymentController extends Controller
         return match ($payment->status) {
             PaymentStatus::COMPLETED => $this->success('Payment verified successfully', $data),
             PaymentStatus::PENDING   => $this->pending($data, 'Payment is still being processed. Please check back shortly.', 202),
-            PaymentStatus::DECLINED  => $this->error('Payment was declined. Please try a different payment method.', 400, 'PAYMENT_DECLINED', $data),
-            PaymentStatus::CANCELLED => $this->error('Payment was cancelled.', 400, 'PAYMENT_CANCELLED', $data),
-            PaymentStatus::ERROR     => $this->error('An error occurred while processing payment. Please try again.', 400, 'PAYMENT_ERROR', $data),
+            PaymentStatus::FAILED    => $this->error('Payment failed. Please try a different payment method.', 400, 'PAYMENT_FAILED', $data),
             default                  => $this->pending($data, 'Payment is being initiated.', 202),
         };
     }

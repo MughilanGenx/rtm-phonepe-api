@@ -7,9 +7,7 @@ enum PaymentStatus: string
     case INITIATED = 'initiated';
     case PENDING   = 'pending';
     case COMPLETED = 'completed';
-    case DECLINED  = 'declined';
-    case CANCELLED = 'cancelled';
-    case ERROR     = 'error';
+    case FAILED    = 'failed';
 
     public function label(): string
     {
@@ -17,9 +15,7 @@ enum PaymentStatus: string
             self::INITIATED => 'Initiated',
             self::PENDING   => 'Pending',
             self::COMPLETED => 'Completed',
-            self::DECLINED  => 'Declined',
-            self::CANCELLED => 'Cancelled',
-            self::ERROR     => 'Error',
+            self::FAILED    => 'Failed',
         };
     }
 
@@ -30,9 +26,7 @@ enum PaymentStatus: string
     {
         return in_array($this, [
             self::COMPLETED,
-            self::DECLINED,
-            self::CANCELLED,
-            self::ERROR,
+            self::FAILED,
         ]);
     }
 }
