@@ -299,7 +299,7 @@ class PhonepeServices
     private function mapPhonepeStatusToAppStatus(?string $phonepeStatus): string
     {
         if (! $phonepeStatus) {
-            return PaymentStatus::ERROR->value;
+            return PaymentStatus::FAILED->value;
         }
 
         Log::error($phonepeStatus);
