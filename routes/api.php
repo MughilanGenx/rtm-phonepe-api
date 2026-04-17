@@ -40,6 +40,9 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/reset-user-password', [AuthController::class, 'newUserLogin'])
         ->name('user.password');
 
+    Route::get('/payment-modes', [PaymentController::class, 'getPaymentModes'])
+    ->name('payment.modes');
+
     Route::prefix('user')->group(function () {
         Route::get('/roles', [UserManagementController::class, 'index'])
             ->name('user.roles');
@@ -60,3 +63,5 @@ Route::middleware('auth:api')->group(function () {
 
 Route::get('/transactions/{orderId}', [PaymentController::class, 'getTransactionById'])
     ->name('payment.transaction.show');
+
+

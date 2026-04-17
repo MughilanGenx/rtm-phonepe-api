@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\PhonePe;
 
+use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
@@ -811,5 +812,43 @@ class PaymentController extends Controller
             PaymentStatus::ERROR     => $this->error('An error occurred while processing payment. Please try again.', 400, 'PAYMENT_ERROR', $data),
             default                  => $this->pending($data, 'Payment is being initiated.', 202),
         };
+    }
+
+    // =========================================================================
+    // 8. Payment Mode Options
+    // =========================================================================
+
+    /**
+     * Return all valid payment modes from the PaymentMode enum.
+     * Used by the frontend to populate the payment mode filter dropdown.
+     *
+     * GET /api/payment-modes
+     */
+    #[OA\Get(
+        path: '/api/payment-modes',
+        summary: 'Get Payment Mode Options',
+        description: 'Returns all valid payment mode values from the PaymentMode enum for use in frontend filter dropdowns.',
+        tags: ['Payment'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Payment modes returned successfully',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'data', type: 'array', items: new OA\Items(
+                            properties: [
+                                new OA\Property(property: 'value', type: 'string', example: 'UPI'),
+                                new OA\Property(property: 'label', type: 'string', example: 'UPI'),
+                            ]
+                        ))
+                    ]
+                )
+            )
+        ]
+    )]
+    public function getPaymentModes(): JsonResponse
+    {
+        return $this->success('Payment modes fetched successfully', PaymentMode::options());
     }
 }
