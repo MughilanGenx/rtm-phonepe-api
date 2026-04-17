@@ -1026,6 +1026,11 @@
                                                         "type": "string",
                                                         "example": "11.00"
                                                     },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "Payment for order",
+                                                        "nullable": true
+                                                    },
                                                     "status": {
                                                         "type": "string",
                                                         "example": "completed"

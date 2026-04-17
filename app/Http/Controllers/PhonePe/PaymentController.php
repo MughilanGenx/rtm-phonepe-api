@@ -667,6 +667,7 @@ class PaymentController extends Controller
                                     new OA\Property(property: 'email', type: 'string', format: 'email', example: 'test@gmail.com'),
                                     new OA\Property(property: 'phone', type: 'string', example: '9999233434'),
                                     new OA\Property(property: 'amount', type: 'string', example: '11.00'),
+                                    new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Payment for order'),
                                     new OA\Property(property: 'status', type: 'string', example: 'completed'),
                                     new OA\Property(
                                         property: 'payment_response',
@@ -779,6 +780,7 @@ class PaymentController extends Controller
             'email',
             'phone',
             'amount',
+            'description',
             'status',
             'payment_response',
             'last_synced_at',
