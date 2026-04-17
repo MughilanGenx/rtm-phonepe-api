@@ -829,6 +829,7 @@ class PaymentController extends Controller
         summary: 'Get Payment Mode Options',
         description: 'Returns all valid payment mode values from the PaymentMode enum for use in frontend filter dropdowns.',
         tags: ['Payment'],
+        security: [['bearerAuth' => []]],
         responses: [
             new OA\Response(
                 response: 200,
@@ -836,7 +837,10 @@ class PaymentController extends Controller
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'status', type: 'string', nullable: true, example: null),
+                        new OA\Property(property: 'message', type: 'string', example: 'Payment modes fetched successfully'),
                         new OA\Property(property: 'data', type: 'array', items: new OA\Items(
+                            type: 'object',
                             properties: [
                                 new OA\Property(property: 'value', type: 'string', example: 'UPI'),
                                 new OA\Property(property: 'label', type: 'string', example: 'UPI'),
@@ -844,7 +848,9 @@ class PaymentController extends Controller
                         ))
                     ]
                 )
-            )
+            ),
+            new OA\Response(response: 401, description: 'Unauthenticated'),
+            new OA\Response(response: 500, description: 'Internal Server Error')
         ]
     )]
     public function getPaymentModes(): JsonResponse

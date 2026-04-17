@@ -1101,6 +1101,15 @@
                                             "type": "boolean",
                                             "example": true
                                         },
+                                        "status": {
+                                            "type": "string",
+                                            "example": null,
+                                            "nullable": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Payment modes fetched successfully"
+                                        },
                                         "data": {
                                             "type": "array",
                                             "items": {
@@ -1122,8 +1131,19 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/user/roles": {
