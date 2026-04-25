@@ -24,6 +24,9 @@ Route::post('/webhook/phonepe', [PaymentController::class, 'webhook'])
 Route::post('/login', [AuthController::class, 'login'])
     ->name('login');
 
+        Route::post('/generate-payment-link', [PaymentController::class, 'generatePaymentLink'])
+        ->name('payment.generate');
+
 Route::middleware('auth:api')->group(function () {
     Route::post('/register', [AuthController::class, 'registerNewUser'])
         ->name('register');
@@ -31,8 +34,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])
         ->name('logout');
 
-    Route::post('/generate-payment-link', [PaymentController::class, 'generatePaymentLink'])
-        ->name('payment.generate');
+
 
     Route::get('/transactions', [PaymentController::class, 'getAllTransactions'])
         ->name('payment.transactions');
