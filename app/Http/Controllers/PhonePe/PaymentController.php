@@ -91,7 +91,7 @@ class PaymentController extends Controller
             ?? 'ORDER_' . strtoupper(substr(uniqid('', true), 0, 10));
 
         $payment = Payment::create([
-            'user_id'           => $user->id,
+            'user_id'           => $user?->id,
             'merchant_order_id' => $merchantOrderId,
             'amount'            => $request->amount,
             'name'              => $request->name,
