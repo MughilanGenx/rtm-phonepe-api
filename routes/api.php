@@ -1,9 +1,14 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\PhonePe\PaymentController;
 use App\Http\Controllers\User\UserManagementController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/health', [HealthController::class, 'index'])
+    ->name('health.check')
+    ->withoutMiddleware(['auth']);
 
 Route::get('/pay/{merchantOrderId}', [PaymentController::class, 'processSharedLink'])
     ->name('payment.process')
