@@ -10,35 +10,53 @@ use Illuminate\Support\Facades\Log;
 
 class PhonepeServices
 {
-    private string $clientId;
+    private ?string $clientId;
     private string $clientSecret;
     private string $baseUrl;
     private string $clientVersion;
     private ?string $webhookSecret;
+    private ?string $merchantId;
 
     public function __construct()
     {
-        $this->clientId      = config('services.phonepe.client_id');
+        $this->clientId      = trim(config('services.phonepe.client_id') ?? '');
         $this->clientSecret  = config('services.phonepe.client_secret');
         $this->clientVersion = config('services.phonepe.client_version', '1');
         $this->baseUrl       = config('services.phonepe.base_url');
         $this->webhookSecret = config('services.phonepe.webhook_secret'); 
+        $this->merchantId    = config('services.phonepe.merchant_id');
+
+        // Adjust base URL for V1 production if clientId is missing (Standard PG integration)
+        if (empty($this->clientId) && config('services.phonepe.env') === 'production') {
+            $this->baseUrl = 'https://api.phonepe.com/apis/hermes';
+        }
     }
 
     /**
-     * Retrieve a cached OAuth access token from PhonePe.
+     * Check if using V2 (Enterprise) or V1 (Standard) API.
+     */
+    private function isV2(): bool
+    {
+        return ! empty($this->clientId);
+    }
+
+    /**
+     * Retrieve a cached OAuth access token from PhonePe (V2 Enterprise only).
      *
      * @throws \Exception if authentication fails
      */
     public function getAccessToken(): string
     {
+        if (! $this->isV2()) {
+            throw new \Exception('OAuth token is not required for PhonePe V1 (Standard) API.');
+        }
+
         return Cache::remember('phonepe_access_token', 600, function () {
             $authUrl = config('services.phonepe.env') === 'production'
                 ? 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token'
                 : 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token';
 
             $response = Http::asForm()
-                // ->withoutVerifying() // Disable SSL for sandbox only
                 ->post($authUrl, [
                     'client_id'      => $this->clientId,
                     'client_secret'  => $this->clientSecret,
@@ -58,13 +76,14 @@ class PhonepeServices
 
     /**
      * Initiate a PhonePe checkout payment.
-     *
-     * @param  array{merchant_order_id: string, amount: float, name: string, email: string, phone: string}  $data
-     * @return array The PhonePe API response (normalized to root level)
-     * @throws \Exception if the API call fails
+     * Supports both V1 (Standard) and V2 (Enterprise) based on configuration.
      */
     public function initiatePayment(array $data): array
     {
+        if (! $this->isV2()) {
+            return $this->initiatePaymentV1($data);
+        }
+
         $token = $this->getAccessToken();
 
         $payload = [
@@ -73,20 +92,18 @@ class PhonepeServices
             'expireAfter'     => 1200, // 20 minutes
             'metaInfo'        => [
                 'udf1' => $data['name'],
-                'udf2' => $data['email'],
-                'udf3' => $data['phone'],
+                'udf2' => $data['phone'],
             ],
             'paymentFlow' => [
                 'type'    => 'PG_CHECKOUT',
                 'message' => 'Payment for order ' . $data['merchant_order_id'],
                 'merchantUrls' => [
-                    // PhonePe will GET this URL when the user completes/cancels payment
                     'redirectUrl' => config('services.phonepe.redirect_url') . '?orderId=' . $data['merchant_order_id'],
                 ],
             ],
         ];
 
-        Log::info('PhonePe initiate payment', [
+        Log::info('PhonePe V2 initiate payment', [
             'merchant_order_id' => $data['merchant_order_id'],
             'amount_paise'      => $payload['amount'],
         ]);
@@ -118,17 +135,70 @@ class PhonepeServices
     }
 
     /**
+     * Initiate V1 (Standard PG) Payment.
+     */
+    private function initiatePaymentV1(array $data): array
+    {
+        $merchantTransactionId = $data['merchant_order_id'];
+        
+        $payload = [
+            'merchantId'            => $this->merchantId,
+            'merchantTransactionId' => $merchantTransactionId,
+            'merchantUserId'        => 'USER_' . uniqid(),
+            'amount'                => (int) ($data['amount'] * 100),
+            'redirectUrl'           => config('services.phonepe.redirect_url') . '?orderId=' . $merchantTransactionId,
+            'redirectMode'          => 'REDIRECT',
+            'callbackUrl'           => url('/api/webhook/phonepe'),
+            'mobileNumber'          => $data['phone'] ?? null,
+            'paymentInstrument'     => [
+                'type' => 'PAY_PAGE',
+            ],
+        ];
+
+        $base64Payload = base64_encode(json_encode($payload));
+        $xVerify = $this->calculateV1Header($base64Payload, '/pg/v1/pay');
+
+        Log::info('PhonePe V1 initiate payment', [
+            'merchant_order_id' => $merchantTransactionId,
+            'amount_paise'      => $payload['amount'],
+        ]);
+
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+            'X-VERIFY'     => $xVerify,
+        ])
+        ->withoutVerifying()
+        ->post($this->baseUrl . '/pg/v1/pay', [
+            'request' => $base64Payload,
+        ]);
+
+        if (! $response->successful()) {
+            throw new \Exception('PhonePe V1 payment initiation failed: ' . $response->body());
+        }
+
+        $json = $response->json();
+        
+        return [
+            'success'     => $json['success'] ?? false,
+            'redirectUrl' => $json['data']['instrumentResponse']['redirectInfo']['url'] ?? null,
+            'data'        => $json['data'] ?? [],
+        ];
+    }
+
+    /**
      * Query PhonePe for the current order status.
-     *
-     * @throws \Exception if the API call fails or returns empty body
      */
     public function checkStatus(string $merchantOrderId, bool $withDetails = true): array
     {
+        if (! $this->isV2()) {
+            return $this->checkStatusV1($merchantOrderId);
+        }
+
         $token = $this->getAccessToken();
         $url   = $this->baseUrl . '/checkout/v2/order/' . $merchantOrderId . '/status';
         $query = $withDetails ? ['details' => 'true'] : [];
 
-        Log::info('PhonePe status check', ['merchant_order_id' => $merchantOrderId]);
+        Log::info('PhonePe V2 status check', ['merchant_order_id' => $merchantOrderId]);
 
         $response = Http::withHeaders([
             'Authorization' => 'O-Bearer ' . $token,
@@ -148,10 +218,7 @@ class PhonepeServices
 
         $body = (string) $response->body();
         if ($response->status() === 204 || trim($body) === '') {
-            throw new \Exception(
-                'PhonePe returned an empty response for order ' . $merchantOrderId . '. ' .
-                'Ensure PHONEPE_ENV matches the environment where the payment was created.'
-            );
+            throw new \Exception('PhonePe returned an empty response for order ' . $merchantOrderId);
         }
 
         $json = $response->json();
@@ -163,18 +230,45 @@ class PhonepeServices
     }
 
     /**
-     * Normalize PhonePe order status response — unwrap `data` wrapper if present.
-     *
-     * @throws \Exception if PhonePe signals a failure
+     * Check V1 (Standard PG) Payment Status.
+     */
+    private function checkStatusV1(string $merchantTransactionId): array
+    {
+        $endpoint = "/pg/v1/status/{$this->merchantId}/{$merchantTransactionId}";
+        $xVerify = $this->calculateV1Header('', $endpoint); 
+
+        Log::info('PhonePe V1 status check', ['merchant_order_id' => $merchantTransactionId]);
+
+        $response = Http::withHeaders([
+            'Content-Type'  => 'application/json',
+            'X-VERIFY'      => $xVerify,
+            'X-MERCHANT-ID' => $this->merchantId,
+        ])
+        ->withoutVerifying()
+        ->get($this->baseUrl . $endpoint);
+
+        if (! $response->successful()) {
+            throw new \Exception('PhonePe V1 status check failed: ' . $response->body());
+        }
+
+        $json = $response->json();
+        return $this->normalizeOrderStatusResponse($json);
+    }
+
+    /**
+     * Normalize PhonePe order status response.
      */
     public function normalizeOrderStatusResponse(array $json): array
     {
-        if (array_key_exists('success', $json) && $json['success'] === false) {
+        $code = $json['code'] ?? null;
+        $isPaymentFailure = in_array($code, ['PAYMENT_ERROR', 'PAYMENT_DECLINED', 'TIMED_OUT']);
+
+        if (array_key_exists('success', $json) && $json['success'] === false && ! $isPaymentFailure) {
             $msg = $json['message'] ?? $json['code'] ?? 'Unknown PhonePe error';
             throw new \Exception('PhonePe order status error: ' . $msg);
         }
 
-        if (($json['success'] ?? null) === true && isset($json['data']) && is_array($json['data'])) {
+        if (isset($json['data']) && is_array($json['data'])) {
             return $json['data'];
         }
 
@@ -182,7 +276,7 @@ class PhonepeServices
     }
 
     /**
-     * Decode a PhonePe base64-encoded `response` field if present.
+     * Decode a PhonePe base64-encoded `response` field.
      */
     public function decodeResponsePayload(array $payload): array
     {
@@ -196,18 +290,18 @@ class PhonepeServices
         }
 
         $decodedArray = json_decode($decodedJson, true);
-
         return is_array($decodedArray) ? $decodedArray : $payload;
     }
 
     /**
      * Extract merchantOrderId from PhonePe webhook/callback payload.
-     * PhonePe may return it in different locations depending on the event type.
      */
     public function extractMerchantOrderId(array $payload): ?string
     {
         return $payload['merchantOrderId']
             ?? $payload['data']['merchantOrderId']
+            ?? $payload['merchantTransactionId'] 
+            ?? $payload['data']['merchantTransactionId'] 
             ?? $payload['transactionId']
             ?? $payload['data']['transactionId']
             ?? null;
@@ -218,21 +312,13 @@ class PhonepeServices
      */
     public function attributesFromStatusResponse(array $statusResponse): array
     {
-        // Unwrap data wrapper if present
         $data = isset($statusResponse['data']) && is_array($statusResponse['data'])
             ? $statusResponse['data']
             : $statusResponse;
 
-        // PhonePe uses 'state' for order status, fallback to 'status' or 'code'
         $phonepeStatus = $data['state'] ?? $data['status'] ?? $data['code'] ?? null;
         $appStatus     = $this->mapPhonepeStatusToAppStatus($phonepeStatus);
 
-        Log::info('PhonePe status mapped', [
-            'phonepe_status' => $phonepeStatus,
-            'app_status'     => $appStatus,
-        ]);
-
-        // Extract paymentMode and transactionId from first paymentDetails entry
         $paymentMode = null;
         $nestedTransactionId = null;
         $paymentDetails = $data['paymentDetails'] ?? [];
@@ -250,7 +336,6 @@ class PhonepeServices
             'last_synced_at'   => now(),
         ];
 
-        // Set paid_at only when payment is completed for the first time
         if ($appStatus === PaymentStatus::COMPLETED->value) {
             $attrs['paid_at'] = now();
         }
@@ -259,38 +344,33 @@ class PhonepeServices
     }
 
     /**
-     * Validate PhonePe webhook HMAC-SHA256 signature.
-     *
-     * PhonePe sends: X-Verify header = SHA256(rawBody + webhookSecret)
-     * Returns true if signature matches or if no webhook secret is configured (skip validation).
+     * Validate PhonePe webhook signature.
      */
     public function validateWebhookSignature(Request $request): bool
     {
-        if (empty($this->webhookSecret)) {
-            Log::warning('PhonePe webhook secret not configured — skipping signature validation');
-            return true;
-        }
-
         $receivedSignature = $request->header('X-Verify');
-
         if (empty($receivedSignature)) {
-            Log::warning('PhonePe webhook: X-Verify header missing');
             return false;
         }
 
-        $rawBody           = $request->getContent();
-        $expectedSignature = hash_hmac('sha256', $rawBody, $this->webhookSecret);
-
-        $valid = hash_equals($expectedSignature, $receivedSignature);
-
-        if (! $valid) {
-            Log::warning('PhonePe webhook signature mismatch', [
-                'received' => $receivedSignature,
-                'expected' => $expectedSignature,
-            ]);
+        if ($this->isV2()) {
+            if (empty($this->webhookSecret)) return true;
+            $expectedSignature = hash_hmac('sha256', $request->getContent(), $this->webhookSecret);
+            return hash_equals($expectedSignature, $receivedSignature);
+        } else {
+            $base64Response = $request->input('response');
+            if (empty($base64Response)) return false;
+            $expectedSignature = hash('sha256', $base64Response . $this->clientSecret) . '###' . $this->clientVersion;
+            return hash_equals($expectedSignature, $receivedSignature);
         }
+    }
 
-        return $valid;
+    /**
+     * Calculate X-VERIFY header for V1 API.
+     */
+    private function calculateV1Header(string $payload, string $endpoint): string
+    {
+        return hash('sha256', $payload . $endpoint . $this->clientSecret) . '###' . $this->clientVersion;
     }
 
     /**
@@ -298,18 +378,14 @@ class PhonepeServices
      */
     private function mapPhonepeStatusToAppStatus(?string $phonepeStatus): string
     {
-        if (! $phonepeStatus) {
-            return PaymentStatus::FAILED->value;
-        }
-
-        Log::error($phonepeStatus);
+        if (! $phonepeStatus) return PaymentStatus::FAILED->value;
 
         return match (strtoupper($phonepeStatus)) {
-            'COMPLETED' => PaymentStatus::COMPLETED->value,
-            'PENDING'   => PaymentStatus::PENDING->value,
-            'FAILED'    => PaymentStatus::FAILED->value,
-            'INITIATED' => PaymentStatus::INITIATED->value,
-            default     => PaymentStatus::FAILED->value,
+            'COMPLETED', 'SUCCESS', 'PAYMENT_SUCCESS' => PaymentStatus::COMPLETED->value,
+            'PENDING'                                 => PaymentStatus::PENDING->value,
+            'FAILED', 'PAYMENT_ERROR', 'PAYMENT_DECLINED', 'BAD_REQUEST', 'TIMED_OUT' => PaymentStatus::FAILED->value,
+            'INITIATED'                               => PaymentStatus::INITIATED->value,
+            default                                   => PaymentStatus::FAILED->value,
         };
     }
 }
