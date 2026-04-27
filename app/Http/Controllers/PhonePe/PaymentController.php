@@ -125,9 +125,7 @@ class PaymentController extends Controller
             ]);
         }
 
-        if(env('APP_ENV') == 'local'){
-            $paymentLink = url('/api/pay/' . $merchantOrderId);
-        }
+        $paymentLink = url('/api/pay/' . $merchantOrderId);
 
         return $this->success('Payment link generated successfully', [
             'merchant_order_id' => $merchantOrderId,

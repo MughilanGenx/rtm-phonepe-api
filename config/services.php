@@ -36,18 +36,18 @@ return [
     ],
 
     'phonepe' => [
-        'client_id'      => env('PHONEPE_CLIENT_ID'),
-        'client_secret'  => env('PHONEPE_CLIENT_SECRET'),
-        'client_version' => env('PHONEPE_CLIENT_VERSION', '1'),
+        'client_id'      => env('PHONEPE_CLIENT_ID'), // If empty, the service uses Standard V1 (Merchant) API
+        'client_secret'  => env('PHONEPE_CLIENT_SECRET'), // Used as OAuth secret in V2, or Salt Key in V1
+        'client_version' => env('PHONEPE_CLIENT_VERSION', '1'), // Used as Salt Index in V1
         'merchant_id'    => env('PHONEPE_MERCHANT_ID'),
         'env'            => env('PHONEPE_ENV', 'sandbox'),
-        'webhook_secret' => env('PHONEPE_WEBHOOK_SECRET'), // Used for HMAC signature validation
+        'webhook_secret' => env('PHONEPE_WEBHOOK_SECRET'), // HMAC secret for V2 webhooks (optional for V1)
 
         'redirect_url'   => env('PHONEPE_REDIRECT_URL', env('FRONTEND_URL') . '/payment/status'),
 
         'base_url' => env('PHONEPE_ENV', 'sandbox') === 'production'
-            ? 'https://api.phonepe.com/apis/pg'
-            : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
+            ? 'https://api.phonepe.com/apis/pg' // V2 Production (Service will override for V1)
+            : 'https://api-preprod.phonepe.com/apis/pg-sandbox', // Pre-prod (V1 & V2)
     ],
 
     'aisensy'=> [
