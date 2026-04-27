@@ -38,7 +38,7 @@ class PhonepeServices
                 : 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token';
 
             $response = Http::asForm()
-                ->withoutVerifying() // Disable SSL for sandbox only
+                // ->withoutVerifying() // Disable SSL for sandbox only
                 ->post($authUrl, [
                     'client_id'      => $this->clientId,
                     'client_secret'  => $this->clientSecret,
