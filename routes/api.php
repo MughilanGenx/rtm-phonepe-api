@@ -1,8 +1,13 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\PhonePe\PaymentController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/health', [HealthController::class, 'index'])
+    ->name('health.check')
+    ->withoutMiddleware(['auth']);
 
 Route::post('/generate-payment-link', [PaymentController::class, 'generatePaymentLink'])
     ->name('payment.generate');

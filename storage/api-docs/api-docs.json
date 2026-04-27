@@ -127,6 +127,38 @@
                 ]
             }
         },
+        "/api/health": {
+            "get": {
+                "tags": [
+                    "Health"
+                ],
+                "summary": "API Health Check",
+                "description": "Returns API health status.",
+                "operationId": "f5cd8cf984b7dabef10f8caeabcf4fd4",
+                "responses": {
+                    "200": {
+                        "description": "API is healthy",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "ok"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "API is healthy"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/generate-payment-link": {
             "post": {
                 "tags": [
@@ -639,6 +671,10 @@
         {
             "name": "Auth",
             "description": "Authentication API Endpoints"
+        },
+        {
+            "name": "Health",
+            "description": "API health check endpoints"
         },
         {
             "name": "Payment",
